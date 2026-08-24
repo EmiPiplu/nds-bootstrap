@@ -86,6 +86,16 @@
 #define	REG_EXTKEYINPUT	(*(vuint16*)0x04000136)
 #define	REG_WIFIIRQ	(*(vuint16*)0x04808012)
 
+#define PLATINUM_RNG_ADDR     0x021BFB14
+#define PLATINUM_RNG_MAGIC    0x50474E52 // "RNGP"
+
+#define PLATINUM_SHARED_MAGIC 9
+#define PLATINUM_SHARED_SEED  10
+
+static bool platinumRngTrackerInitialized = false;
+static bool platinumRngSawZero = false;
+static bool platinumRngCaptured = false;
+
 extern u32 ce7;
 
 static const char *unlaunchAutoLoadID = "AutoLoadInfo";
@@ -213,6 +223,48 @@ extern u32 romMap[][3];
 u32 currentSrlAddr = 0;
 
 void i2cIRQHandler(void);
+
+static inline void trackPlatinumInitialSeed(void) {
+	if (!platinumRngTrackerInitialized) {
+		sharedAddr[PLATINUM_SHARED_MAGIC] = 0;
+		sharedAddr[PLATINUM_SHARED_SEED] = 0;
+
+		platinumRngTrackerInitialized = true;
+	}
+
+	u32 state = *(vu32*)PLATINUM_RNG_ADDR;
+
+	/*
+	 * During Platinum startup the RNG storage should pass through
+	 * zero before the game installs its initial seed.
+	 *
+	 * Seeing zero therefore arms us for the next non-zero value.
+	 */
+	if (state == 0) {
+		platinumRngSawZero = true;
+
+		// Also handles a fresh game boot / soft reset.
+		if (platinumRngCaptured) {
+			platinumRngCaptured = false;
+			sharedAddr[PLATINUM_SHARED_MAGIC] = 0;
+			sharedAddr[PLATINUM_SHARED_SEED] = 0;
+		}
+
+		return;
+	}
+
+	if (!platinumRngCaptured && platinumRngSawZero) {
+		/*
+		 * Write the seed first and the validity marker last,
+		 * so ARM9 can never see "valid" with half-written data.
+		 */
+		sharedAddr[PLATINUM_SHARED_SEED] = state;
+		sharedAddr[PLATINUM_SHARED_MAGIC] = PLATINUM_RNG_MAGIC;
+
+		platinumRngCaptured = true;
+		platinumRngSawZero = false;
+	}
+}
 
 static void unlaunchSetFilename(void) {
 	const u8* filename = 
@@ -1822,6 +1874,7 @@ void myIrqHandlerFIFO(void) {
 
 void myIrqHandlerVBlank(void) {
   while (1) {
+	trackPlatinumInitialSeed();
 	#ifdef DEBUG		
 	nocashMessage("myIrqHandlerVBlank");
 	#endif	

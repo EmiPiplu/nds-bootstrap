@@ -704,7 +704,10 @@ static void jumpToAddress(void) {
 }
 
 #define PLATINUM_RNG_ADDR 0x021BFB14
-#define PLATINUM_RNG_SEARCH_MAX 100000
+#define PLATINUM_RNG_MAGIC    0x50474E52
+
+#define PLATINUM_SHARED_MAGIC 9
+#define PLATINUM_SHARED_SEED  10
 
 static bool platinumRngBaseSet = false;
 static u32 platinumRngBase = 0;
@@ -713,18 +716,23 @@ static u32 platinumRngNext(u32 seed) {
 	return seed * 0x41C64E6D + 0x6073;
 }
 
-static s32 platinumRngDistance(u32 start, u32 target) {
-	u32 rng = start;
+static u32 platinumRngDistance(u32 state, u32 target) {
+	u32 curMult = 0x41C64E6D;
+	u32 curPlus = 0x6073;
 
-	for (s32 i = 0; i <= PLATINUM_RNG_SEARCH_MAX; i++) {
-		if (rng == target) {
-			return i;
+	u32 distance = 0;
+
+	for (u32 bit = 1; bit != 0; bit <<= 1) {
+		if ((state & bit) != (target & bit)) {
+			state = state * curMult + curPlus;
+			distance |= bit;
 		}
 
-		rng = platinumRngNext(rng);
+		curPlus *= curMult + 1;
+		curMult *= curMult;
 	}
 
-	return -1;
+	return distance;
 }
 
 static void platinumRngViewer(void) {
@@ -740,16 +748,16 @@ static void platinumRngViewer(void) {
 
 		u32 current = *(vu32*)PLATINUM_RNG_ADDR;
 
-		// First ever visit establishes zero automatically.
-		if (!platinumRngBaseSet) {
-			platinumRngBase = current;
-			platinumRngBaseSet = true;
-		}
+		bool haveInitialSeed =
+			sharedAddr[PLATINUM_SHARED_MAGIC] == PLATINUM_RNG_MAGIC;
 
-		s32 advances = platinumRngDistance(
-			platinumRngBase,
-			current
-		);
+		u32 initial = sharedAddr[PLATINUM_SHARED_SEED];
+
+		u32 advances = 0;
+
+		if (haveInitialSeed) {
+			advances = platinumRngDistance(initial, current);
+		}
 
 		print(2, 2,
 			(const unsigned char*)"PLATINUM RNG",
@@ -757,25 +765,33 @@ static void platinumRngViewer(void) {
 			false);
 
 		print(2, 5,
+			(const unsigned char*)"INITIAL:",
+			FONT_LIGHT_GRAY,
+			false);
+
+		if (haveInitialSeed) {
+			printHex(
+				12, 5,
+				initial,
+				4,
+				FONT_LIGHT_BLUE,
+				false);
+		} else {
+			print(
+				12, 5,
+				(const unsigned char*)"--------",
+				FONT_RED,
+				false);
+		}
+
+		print(2, 7,
 			(const unsigned char*)"CURRENT:",
 			FONT_LIGHT_GRAY,
 			false);
 
 		printHex(
-			12, 5,
-			current,
-			4,
-			FONT_LIGHT_BLUE,
-			false);
-
-		print(2, 7,
-			(const unsigned char*)"BASE:",
-			FONT_LIGHT_GRAY,
-			false);
-
-		printHex(
 			12, 7,
-			platinumRngBase,
+			current,
 			4,
 			FONT_LIGHT_BLUE,
 			false);
@@ -785,25 +801,20 @@ static void platinumRngViewer(void) {
 			FONT_LIGHT_GRAY,
 			false);
 
-		if (advances >= 0) {
+		if (haveInitialSeed) {
 			printDec(
 				12, 9,
-				(u32)advances,
-				6,
+				advances,
+				10,
 				FONT_LIME,
 				false);
 		} else {
 			print(
 				12, 9,
-				(const unsigned char*)">100000",
+				(const unsigned char*)"----------",
 				FONT_RED,
 				false);
 		}
-
-		print(2, 19,
-			(const unsigned char*)"X: Set base",
-			FONT_LIGHT_GRAY,
-			false);
 
 		print(2, 20,
 			(const unsigned char*)"B: Back",

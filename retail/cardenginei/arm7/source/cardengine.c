@@ -86,15 +86,49 @@
 #define	REG_EXTKEYINPUT	(*(vuint16*)0x04000136)
 #define	REG_WIFIIRQ	(*(vuint16*)0x04808012)
 
-#define PLATINUM_RNG_ADDR     0x021BFB14
-#define PLATINUM_RNG_MAGIC    0x50474E52 // "RNGP"
+#define PLATINUM_RNG_ADDR      0x021BFB14
+#define PLATINUM_MT0_ADDR      0x021BFB18
 
-#define PLATINUM_SHARED_MAGIC 9
-#define PLATINUM_SHARED_SEED  10
+#define PLATINUM_RNG_MAGIC     0x50474E52 // "RNGP"
+
+#define PLATINUM_SHARED_MAGIC  9
+#define PLATINUM_SHARED_SEED   10
+#define PLATINUM_SHARED_COUNT  11
 
 static bool platinumRngTrackerInitialized = false;
-static bool platinumRngSawZero = false;
-static bool platinumRngCaptured = false;
+static bool platinumRngWasEqual = false;
+
+static inline void trackPlatinumInitialSeed(void) {
+	if (!platinumRngTrackerInitialized) {
+		sharedAddr[PLATINUM_SHARED_MAGIC] = 0;
+		sharedAddr[PLATINUM_SHARED_SEED] = 0;
+		sharedAddr[PLATINUM_SHARED_COUNT] = 0;
+
+		platinumRngTrackerInitialized = true;
+	}
+
+	u32 current = *(vu32*)PLATINUM_RNG_ADDR;
+	u32 mt0 = *(vu32*)PLATINUM_MT0_ADDR;
+
+	bool equal = current != 0 && current == mt0;
+
+	/*
+	 * InitRNG() seeds both generators from the same value:
+	 *
+	 *     MTRNG_SetSeed(seed);
+	 *     LCRNG_SetSeed(seed);
+	 *
+	 * Therefore, when equality appears as an edge, we have observed
+	 * an actual RNG initialization event.
+	 */
+	if (equal && !platinumRngWasEqual) {
+		sharedAddr[PLATINUM_SHARED_SEED] = current;
+		sharedAddr[PLATINUM_SHARED_MAGIC] = PLATINUM_RNG_MAGIC;
+		sharedAddr[PLATINUM_SHARED_COUNT]++;
+	}
+
+	platinumRngWasEqual = equal;
+}
 
 extern u32 ce7;
 
@@ -223,48 +257,6 @@ extern u32 romMap[][3];
 u32 currentSrlAddr = 0;
 
 void i2cIRQHandler(void);
-
-static inline void trackPlatinumInitialSeed(void) {
-	if (!platinumRngTrackerInitialized) {
-		sharedAddr[PLATINUM_SHARED_MAGIC] = 0;
-		sharedAddr[PLATINUM_SHARED_SEED] = 0;
-
-		platinumRngTrackerInitialized = true;
-	}
-
-	u32 state = *(vu32*)PLATINUM_RNG_ADDR;
-
-	/*
-	 * During Platinum startup the RNG storage should pass through
-	 * zero before the game installs its initial seed.
-	 *
-	 * Seeing zero therefore arms us for the next non-zero value.
-	 */
-	if (state == 0) {
-		platinumRngSawZero = true;
-
-		// Also handles a fresh game boot / soft reset.
-		if (platinumRngCaptured) {
-			platinumRngCaptured = false;
-			sharedAddr[PLATINUM_SHARED_MAGIC] = 0;
-			sharedAddr[PLATINUM_SHARED_SEED] = 0;
-		}
-
-		return;
-	}
-
-	if (!platinumRngCaptured && platinumRngSawZero) {
-		/*
-		 * Write the seed first and the validity marker last,
-		 * so ARM9 can never see "valid" with half-written data.
-		 */
-		sharedAddr[PLATINUM_SHARED_SEED] = state;
-		sharedAddr[PLATINUM_SHARED_MAGIC] = PLATINUM_RNG_MAGIC;
-
-		platinumRngCaptured = true;
-		platinumRngSawZero = false;
-	}
-}
 
 static void unlaunchSetFilename(void) {
 	const u8* filename = 

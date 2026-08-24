@@ -708,6 +708,7 @@ static void jumpToAddress(void) {
 
 #define PLATINUM_SHARED_MAGIC 9
 #define PLATINUM_SHARED_SEED  10
+#define PLATINUM_SHARED_COUNT 11
 
 static bool platinumRngBaseSet = false;
 static u32 platinumRngBase = 0;
@@ -815,6 +816,30 @@ static void platinumRngViewer(void) {
 				FONT_RED,
 				false);
 		}
+
+		print(2, 11,
+			(const unsigned char*)"CAPTURES:",
+			FONT_LIGHT_GRAY,
+			false);
+
+		printDec(
+			12, 11,
+			sharedAddr[PLATINUM_SHARED_COUNT],
+			3,
+			FONT_LIGHT_BLUE,
+			false);
+
+		print(2, 13,
+			(const unsigned char*)"MT0:",
+			FONT_LIGHT_GRAY,
+			false);
+
+		printHex(
+			12, 13,
+			*(vu32*)0x021BFB18,
+			4,
+			FONT_LIGHT_BLUE,
+			false);
 
 		print(2, 20,
 			(const unsigned char*)"B: Back",

@@ -98,37 +98,6 @@
 static bool platinumRngTrackerInitialized = false;
 static bool platinumRngWasEqual = false;
 
-static inline void trackPlatinumInitialSeed(void) {
-	if (!platinumRngTrackerInitialized) {
-		sharedAddr[PLATINUM_SHARED_MAGIC] = 0;
-		sharedAddr[PLATINUM_SHARED_SEED] = 0;
-		sharedAddr[PLATINUM_SHARED_COUNT] = 0;
-
-		platinumRngTrackerInitialized = true;
-	}
-
-	u32 current = *(vu32*)PLATINUM_RNG_ADDR;
-	u32 mt0 = *(vu32*)PLATINUM_MT0_ADDR;
-
-	bool equal = current != 0 && current == mt0;
-
-	/*
-	 * InitRNG() seeds both generators from the same value:
-	 *
-	 *     MTRNG_SetSeed(seed);
-	 *     LCRNG_SetSeed(seed);
-	 *
-	 * Therefore, when equality appears as an edge, we have observed
-	 * an actual RNG initialization event.
-	 */
-	if (equal && !platinumRngWasEqual) {
-		sharedAddr[PLATINUM_SHARED_SEED] = current;
-		sharedAddr[PLATINUM_SHARED_MAGIC] = PLATINUM_RNG_MAGIC;
-		sharedAddr[PLATINUM_SHARED_COUNT]++;
-	}
-
-	platinumRngWasEqual = equal;
-}
 
 extern u32 ce7;
 
@@ -257,6 +226,39 @@ extern u32 romMap[][3];
 u32 currentSrlAddr = 0;
 
 void i2cIRQHandler(void);
+
+static inline void trackPlatinumInitialSeed(void) {
+	if (!platinumRngTrackerInitialized) {
+		sharedAddr[PLATINUM_SHARED_MAGIC] = 0;
+		sharedAddr[PLATINUM_SHARED_SEED] = 0;
+		sharedAddr[PLATINUM_SHARED_COUNT] = 0;
+
+		platinumRngTrackerInitialized = true;
+	}
+
+	u32 current = *(vu32*)PLATINUM_RNG_ADDR;
+	u32 mt0 = *(vu32*)PLATINUM_MT0_ADDR;
+
+	bool equal = current != 0 && current == mt0;
+
+	/*
+	 * InitRNG() seeds both generators from the same value:
+	 *
+	 *     MTRNG_SetSeed(seed);
+	 *     LCRNG_SetSeed(seed);
+	 *
+	 * Therefore, when equality appears as an edge, we have observed
+	 * an actual RNG initialization event.
+	 */
+	if (equal && !platinumRngWasEqual) {
+		sharedAddr[PLATINUM_SHARED_SEED] = current;
+		sharedAddr[PLATINUM_SHARED_MAGIC] = PLATINUM_RNG_MAGIC;
+		sharedAddr[PLATINUM_SHARED_COUNT]++;
+	}
+
+	platinumRngWasEqual = equal;
+}
+
 
 static void unlaunchSetFilename(void) {
 	const u8* filename = 

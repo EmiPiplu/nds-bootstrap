@@ -704,11 +704,19 @@ static void jumpToAddress(void) {
 }
 
 #define PLATINUM_RNG_ADDR 0x021BFB14
-#define PLATINUM_RNG_MAGIC    0x50474E52
 
 #define PLATINUM_SHARED_MAGIC 9
 #define PLATINUM_SHARED_SEED  10
 #define PLATINUM_SHARED_COUNT 11
+
+#define PLATINUM_MT_INDEX_ADDR 0x02100834
+#define PLATINUM_MT0_ADDR      0x021BFB18
+
+#define PLATINUM_RNG_MAGIC     0x50474E52 // "RNGP"
+
+
+
+static bool platinumRngTrackerInitialized = false;
 
 
 static u32 platinumRngNext(u32 seed) {

@@ -83,6 +83,15 @@
 #define END_FLAG   0
 #define BUSY_FLAG   4
 
+#define PLATINUM_SHARED_CONTROL 12
+
+#define PLAT_CTRL_ACTIVE  BIT(0)
+#define PLAT_CTRL_STEP    BIT(1)
+#define PLAT_CTRL_RUN     BIT(2)
+#define PLAT_CTRL_BLOCKED BIT(3)
+
+#define PLATINUM_READ_INPUT_ADDR 0x02017B9C
+
 extern cardengineArm9* volatile ce9;
 
 
@@ -259,6 +268,74 @@ vu8* getCacheAddress(int slot) {
 void updateDescriptor(int slot, u32 sector) {
 	cacheDescriptor[slot] = sector;
 	cacheCounter[slot] = accessCounter;
+}
+
+void platinumPauseGate(void) {
+	typedef void (*PlatinumReadInputFunc)(void);
+
+	PlatinumReadInputFunc readInput =
+		(PlatinumReadInputFunc)PLATINUM_READ_INPUT_ADDR;
+
+	/*
+	 * Normal case: essentially zero debugger overhead.
+	 */
+	if (!(sharedAddr[PLATINUM_SHARED_CONTROL] & PLAT_CTRL_ACTIVE)) {
+		readInput();
+		return;
+	}
+
+	/*
+	 * Freeze ARM9 completely while waiting for ARM7 to tell us
+	 * either STEP or RUN.
+	 *
+	 * ARM7 remains alive and continues polling the physical buttons.
+	 */
+	int oldIME = enterCriticalSection();
+
+	sharedAddr[PLATINUM_SHARED_CONTROL] |= PLAT_CTRL_BLOCKED;
+
+	while (1) {
+		u32 control = sharedAddr[PLATINUM_SHARED_CONTROL];
+
+		if (control & PLAT_CTRL_RUN) {
+			/*
+			 * Resume normal execution.
+			 */
+			control &= ~(
+				PLAT_CTRL_ACTIVE |
+				PLAT_CTRL_RUN |
+				PLAT_CTRL_STEP |
+				PLAT_CTRL_BLOCKED
+			);
+
+			sharedAddr[PLATINUM_SHARED_CONTROL] = control;
+
+			leaveCriticalSection(oldIME);
+
+			readInput();
+			return;
+		}
+
+		if (control & PLAT_CTRL_STEP) {
+			/*
+			 * Run exactly one main-loop iteration.
+			 *
+			 * ACTIVE deliberately remains set, so when NitroMain
+			 * reaches us again on the next iteration it freezes
+			 * again.
+			 */
+			control &= ~(PLAT_CTRL_STEP | PLAT_CTRL_BLOCKED);
+
+			sharedAddr[PLATINUM_SHARED_CONTROL] = control;
+
+			leaveCriticalSection(oldIME);
+
+			readInput();
+			return;
+		}
+
+		swiDelay(100);
+	}
 }
 
 #ifdef ASYNCPF

@@ -211,6 +211,7 @@ needFlushDCCache:
 #endif
 .word   vcountHandler
 .word   ipcSyncHandler
+.word   platinumPauseGate
 thumbPatches:
 .word	thumb_card_read_arm9
 .word	thumb_card_irq_enable

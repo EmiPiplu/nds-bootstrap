@@ -462,6 +462,49 @@ static bool patchCardId(cardengineArm9* ce9, const tNDSHeader* ndsHeader, const 
 	return true;
 }
 
+static void patchPlatinumPauseGate(
+	cardengineArm9 *ce9,
+	const tNDSHeader *ndsHeader
+) {
+	const char *tid = getRomTid(ndsHeader);
+
+	/*
+	 * English/USA Platinum only.
+	 */
+	if (strncmp(tid, "CPUE", 4) != 0) {
+		return;
+	}
+
+	/*
+	 * pret xMAP:
+	 *
+	 * NitroMain:
+	 *   02000C88 - 02000E3C
+	 *
+	 * ReadKeypadAndTouchpad:
+	 *   02017B9C
+	 *
+	 * Find the BL rather than hardcoding the call-site address.
+	 */
+	u32 *start = (u32 *)0x02000C88;
+	u32 *end   = (u32 *)0x02000E3C;
+
+	for (u32 *p = start; p < end; p++) {
+		if ((*p & 0xFF000000) != 0xEB000000) {
+			continue;
+		}
+
+		if (getOffsetFromBL(p) == (u32 *)0x02017B9C) {
+			setBL(
+				(u32)p,
+				(u32)ce9->patches->platinumPauseGate
+			);
+
+			break;
+		}
+	}
+}
+
 void patchGbaSlotInit_cont(const tNDSHeader* ndsHeader, bool usesThumb, bool searchAgainForThumb) {
 	extern u32 oldArm7mbk;
 	if (ndsHeader->unitCode == 0 || !dsiModeConfirmed || (oldArm7mbk == 0x080037C0 && *(u32*)0x02FFE1A0 == 0x080037C0) || *(u32*)0x02FFE1A0 == 0x00403000) {
@@ -3213,6 +3256,8 @@ u32 patchCardNdsArm9(cardengineArm9* ce9, const tNDSHeader* ndsHeader, const mod
 		patchTwlSaveFuncs(ce9);
 	}
 
+	
+
 	if (strncmp(romTid, "V2G", 3) == 0 && !dsiModeConfirmed) {
 		// try to patch card read a second time
 		dbg_printf("patch card read a second time\n");
@@ -3293,6 +3338,8 @@ u32 patchCardNdsArm9(cardengineArm9* ce9, const tNDSHeader* ndsHeader, const mod
 	if (colorLutEnabled) {
 		patchMobiclipFrameDraw(ndsHeader, moduleParams);
 	}
+
+	patchPlatinumPauseGate(ce9, ndsHeader);
 
 
 	dbg_printf("ERR_NONE\n\n");

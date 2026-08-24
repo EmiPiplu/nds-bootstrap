@@ -704,62 +704,135 @@ static void jumpToAddress(void) {
 }
 
 #define PLATINUM_RNG_ADDR 0x021BFB14
+#define PLATINUM_RNG_SEARCH_MAX 100000
 
-static void platinumRngViewer(void) {
-	clearScreen(false);
+static bool platinumRngBaseSet = false;
+static u32 platinumRngBase = 0;
 
-	vu8 *raw = (vu8*)PLATINUM_RNG_ADDR;
-	u32 rng = *(vu32*)PLATINUM_RNG_ADDR;
+static u32 platinumRngNext(u32 seed) {
+	return seed * 0x41C64E6D + 0x6073;
+}
 
-	print(2, 2,
-		(const unsigned char*)"PLATINUM RNG",
-		FONT_WHITE,
-		false);
+static s32 platinumRngDistance(u32 start, u32 target) {
+	u32 rng = start;
 
-	print(2, 5,
-		(const unsigned char*)"u32 LE:",
-		FONT_LIGHT_GRAY,
-		false);
+	for (s32 i = 0; i <= PLATINUM_RNG_SEARCH_MAX; i++) {
+		if (rng == target) {
+			return i;
+		}
 
-	printHex(
-		11, 5,
-		rng,
-		4,
-		FONT_LIGHT_BLUE,
-		false
-	);
-
-	print(2, 7,
-		(const unsigned char*)"RAW:",
-		FONT_LIGHT_GRAY,
-		false);
-
-	for (int i = 0; i < 4; i++) {
-		printHex(
-			8 + (i * 3),
-			7,
-			raw[i],
-			1,
-			FONT_LIGHT_BLUE,
-			false
-		);
+		rng = platinumRngNext(rng);
 	}
 
-	print(2, 20,
-		(const unsigned char*)"B: Back",
-		FONT_LIGHT_GRAY,
-		false);
+	return -1;
+}
 
-	waitKeys(KEY_B);
-
-	// Don't let the B press fall through into the RAM viewer
-	// and immediately back us out of that as well.
+static void platinumRngViewer(void) {
+	// X is what opened this screen from the RAM viewer.
+	// Wait for it to be released so it doesn't immediately reset the base.
 	do {
 		while (REG_VCOUNT != 191) mySwiDelay(100);
 		while (REG_VCOUNT == 191) mySwiDelay(100);
-	} while (KEYS & KEY_B);
+	} while (KEYS & KEY_X);
 
-	clearScreen(false);
+	while (1) {
+		clearScreen(false);
+
+		u32 current = *(vu32*)PLATINUM_RNG_ADDR;
+
+		// First ever visit establishes zero automatically.
+		if (!platinumRngBaseSet) {
+			platinumRngBase = current;
+			platinumRngBaseSet = true;
+		}
+
+		s32 advances = platinumRngDistance(
+			platinumRngBase,
+			current
+		);
+
+		print(2, 2,
+			(const unsigned char*)"PLATINUM RNG",
+			FONT_WHITE,
+			false);
+
+		print(2, 5,
+			(const unsigned char*)"CURRENT:",
+			FONT_LIGHT_GRAY,
+			false);
+
+		printHex(
+			12, 5,
+			current,
+			4,
+			FONT_LIGHT_BLUE,
+			false);
+
+		print(2, 7,
+			(const unsigned char*)"BASE:",
+			FONT_LIGHT_GRAY,
+			false);
+
+		printHex(
+			12, 7,
+			platinumRngBase,
+			4,
+			FONT_LIGHT_BLUE,
+			false);
+
+		print(2, 9,
+			(const unsigned char*)"ADVANCES:",
+			FONT_LIGHT_GRAY,
+			false);
+
+		if (advances >= 0) {
+			printDec(
+				12, 9,
+				(u32)advances,
+				6,
+				FONT_LIME,
+				false);
+		} else {
+			print(
+				12, 9,
+				(const unsigned char*)">100000",
+				FONT_RED,
+				false);
+		}
+
+		print(2, 19,
+			(const unsigned char*)"X: Set base",
+			FONT_LIGHT_GRAY,
+			false);
+
+		print(2, 20,
+			(const unsigned char*)"B: Back",
+			FONT_LIGHT_GRAY,
+			false);
+
+		waitKeys(KEY_X | KEY_B);
+
+		if (KEYS & KEY_X) {
+			platinumRngBase = *(vu32*)PLATINUM_RNG_ADDR;
+			platinumRngBaseSet = true;
+
+			// Wait for X release.
+			do {
+				while (REG_VCOUNT != 191) mySwiDelay(100);
+				while (REG_VCOUNT == 191) mySwiDelay(100);
+			} while (KEYS & KEY_X);
+
+		} else if (KEYS & KEY_B) {
+			// Don't pass B back into ramViewer().
+			do {
+				while (REG_VCOUNT != 191) mySwiDelay(100);
+				while (REG_VCOUNT == 191) mySwiDelay(100);
+			} while (KEYS & KEY_B);
+
+			clearScreen(false);
+			return;
+		}
+	}
 }
 
 static void ramViewer(void) {

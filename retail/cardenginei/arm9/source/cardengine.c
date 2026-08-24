@@ -180,6 +180,74 @@ extern void waitFrames(int count);
 	}
 }*/
 
+void platinumPauseGate(void) {
+	typedef void (*PlatinumReadInputFunc)(void);
+
+	PlatinumReadInputFunc readInput =
+		(PlatinumReadInputFunc)PLATINUM_READ_INPUT_ADDR;
+
+	/*
+	 * Normal case: essentially zero debugger overhead.
+	 */
+	if (!(sharedAddr[PLATINUM_SHARED_CONTROL] & PLAT_CTRL_ACTIVE)) {
+		readInput();
+		return;
+	}
+
+	/*
+	 * Freeze ARM9 completely while waiting for ARM7 to tell us
+	 * either STEP or RUN.
+	 *
+	 * ARM7 remains alive and continues polling the physical buttons.
+	 */
+	int oldIME = enterCriticalSection();
+
+	sharedAddr[PLATINUM_SHARED_CONTROL] |= PLAT_CTRL_BLOCKED;
+
+	while (1) {
+		u32 control = sharedAddr[PLATINUM_SHARED_CONTROL];
+
+		if (control & PLAT_CTRL_RUN) {
+			/*
+			 * Resume normal execution.
+			 */
+			control &= ~(
+				PLAT_CTRL_ACTIVE |
+				PLAT_CTRL_RUN |
+				PLAT_CTRL_STEP |
+				PLAT_CTRL_BLOCKED
+			);
+
+			sharedAddr[PLATINUM_SHARED_CONTROL] = control;
+
+			leaveCriticalSection(oldIME);
+
+			readInput();
+			return;
+		}
+
+		if (control & PLAT_CTRL_STEP) {
+			/*
+			 * Run exactly one main-loop iteration.
+			 *
+			 * ACTIVE deliberately remains set, so when NitroMain
+			 * reaches us again on the next iteration it freezes
+			 * again.
+			 */
+			control &= ~(PLAT_CTRL_STEP | PLAT_CTRL_BLOCKED);
+
+			sharedAddr[PLATINUM_SHARED_CONTROL] = control;
+
+			leaveCriticalSection(oldIME);
+
+			readInput();
+			return;
+		}
+
+		swiDelay(100);
+	}
+}
+
 #ifndef DLDI
 static bool inline asyncDataAvailable(u32 src) {
 	for (int i = 0; i < 2; i++) {
@@ -270,73 +338,7 @@ void updateDescriptor(int slot, u32 sector) {
 	cacheCounter[slot] = accessCounter;
 }
 
-void platinumPauseGate(void) {
-	typedef void (*PlatinumReadInputFunc)(void);
 
-	PlatinumReadInputFunc readInput =
-		(PlatinumReadInputFunc)PLATINUM_READ_INPUT_ADDR;
-
-	/*
-	 * Normal case: essentially zero debugger overhead.
-	 */
-	if (!(sharedAddr[PLATINUM_SHARED_CONTROL] & PLAT_CTRL_ACTIVE)) {
-		readInput();
-		return;
-	}
-
-	/*
-	 * Freeze ARM9 completely while waiting for ARM7 to tell us
-	 * either STEP or RUN.
-	 *
-	 * ARM7 remains alive and continues polling the physical buttons.
-	 */
-	int oldIME = enterCriticalSection();
-
-	sharedAddr[PLATINUM_SHARED_CONTROL] |= PLAT_CTRL_BLOCKED;
-
-	while (1) {
-		u32 control = sharedAddr[PLATINUM_SHARED_CONTROL];
-
-		if (control & PLAT_CTRL_RUN) {
-			/*
-			 * Resume normal execution.
-			 */
-			control &= ~(
-				PLAT_CTRL_ACTIVE |
-				PLAT_CTRL_RUN |
-				PLAT_CTRL_STEP |
-				PLAT_CTRL_BLOCKED
-			);
-
-			sharedAddr[PLATINUM_SHARED_CONTROL] = control;
-
-			leaveCriticalSection(oldIME);
-
-			readInput();
-			return;
-		}
-
-		if (control & PLAT_CTRL_STEP) {
-			/*
-			 * Run exactly one main-loop iteration.
-			 *
-			 * ACTIVE deliberately remains set, so when NitroMain
-			 * reaches us again on the next iteration it freezes
-			 * again.
-			 */
-			control &= ~(PLAT_CTRL_STEP | PLAT_CTRL_BLOCKED);
-
-			sharedAddr[PLATINUM_SHARED_CONTROL] = control;
-
-			leaveCriticalSection(oldIME);
-
-			readInput();
-			return;
-		}
-
-		swiDelay(100);
-	}
-}
 
 #ifdef ASYNCPF
 void addToAsyncQueue(u32 sector) {

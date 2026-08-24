@@ -257,8 +257,8 @@ static inline void trackPlatinumDebugControls(void) {
 	 */
 	if (!active) {
 		bool pauseChordHeld =
-			(keys & (KEY_L | KEY_R | KEY_X))
-			== (KEY_L | KEY_R | KEY_X);
+			(keys & (KEY_L | KEY_R | KEY_SELECT))
+			== (KEY_L | KEY_R | KEY_SELECT);
 
 		if (platinumPauseChordWasHeld && !pauseChordHeld) {
 			sharedAddr[PLATINUM_SHARED_CONTROL] |=

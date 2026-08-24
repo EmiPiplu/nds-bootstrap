@@ -184,7 +184,7 @@ void platinumPauseGate(void) {
 	typedef void (*PlatinumReadInputFunc)(void);
 
 	PlatinumReadInputFunc readInput =
-		(PlatinumReadInputFunc)PLATINUM_READ_INPUT_ADDR;
+	(PlatinumReadInputFunc)(PLATINUM_READ_INPUT_ADDR | 1);
 
 	/*
 	 * Normal case: essentially zero debugger overhead.

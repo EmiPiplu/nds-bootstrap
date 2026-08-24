@@ -468,41 +468,52 @@ static void patchPlatinumPauseGate(
 ) {
 	const char *tid = getRomTid(ndsHeader);
 
-	/*
-	 * English/USA Platinum only.
-	 */
 	if (strncmp(tid, "CPUE", 4) != 0) {
 		return;
 	}
 
 	/*
-	 * pret xMAP:
+	 * English Platinum:
 	 *
 	 * NitroMain:
-	 *   02000C88 - 02000E3C
+	 *     02000C88 - 02000E3C   (THUMB)
 	 *
 	 * ReadKeypadAndTouchpad:
-	 *   02017B9C
-	 *
-	 * Find the BL rather than hardcoding the call-site address.
+	 *     02017B9C               (THUMB)
 	 */
-	u32 *start = (u32 *)0x02000C88;
-	u32 *end   = (u32 *)0x02000E3C;
+	u16 *start = (u16 *)0x02000C88;
+	u16 *end   = (u16 *)0x02000E3C;
 
-	for (u32 *p = start; p < end; p++) {
-		if ((*p & 0xFF000000) != 0xEB000000) {
+	for (u16 *p = start; p + 1 < end; p++) {
+		/*
+		 * ARMv5 Thumb BL:
+		 *
+		 * first halfword  = 11110...
+		 * second halfword = 11111...
+		 */
+		if ((p[0] & 0xF800) != 0xF000) {
 			continue;
 		}
 
-		if (getOffsetFromBL(p) == (u32 *)0x02017B9C) {
-			setBL(
+		if ((p[1] & 0xF800) != 0xF800) {
+			continue;
+		}
+
+		if ((u32)getOffsetFromBLThumb(p) == 0x02017B9C) {
+			setBLThumb(
 				(u32)p,
-				(u32)ce9->patches->platinumPauseGate
+				((u32)ce9->patches->platinumPauseGate) & ~1u
 			);
 
-			break;
+			dbg_printf("Platinum pause gate patched at: ");
+			dbg_hexa((u32)p);
+			dbg_printf("\n\n");
+
+			return;
 		}
 	}
+
+	dbg_printf("Platinum pause gate NOT FOUND\n\n");
 }
 
 void patchGbaSlotInit_cont(const tNDSHeader* ndsHeader, bool usesThumb, bool searchAgainForThumb) {

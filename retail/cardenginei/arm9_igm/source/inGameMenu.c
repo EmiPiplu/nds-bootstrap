@@ -703,6 +703,65 @@ static void jumpToAddress(void) {
 	}
 }
 
+#define PLATINUM_RNG_ADDR 0x021BFB14
+
+static void platinumRngViewer(void) {
+	clearScreen(false);
+
+	vu8 *raw = (vu8*)PLATINUM_RNG_ADDR;
+	u32 rng = *(vu32*)PLATINUM_RNG_ADDR;
+
+	print(2, 2,
+		(const unsigned char*)"PLATINUM RNG",
+		FONT_WHITE,
+		false);
+
+	print(2, 5,
+		(const unsigned char*)"u32 LE:",
+		FONT_LIGHT_GRAY,
+		false);
+
+	printHex(
+		11, 5,
+		rng,
+		4,
+		FONT_LIGHT_BLUE,
+		false
+	);
+
+	print(2, 7,
+		(const unsigned char*)"RAW:",
+		FONT_LIGHT_GRAY,
+		false);
+
+	for (int i = 0; i < 4; i++) {
+		printHex(
+			8 + (i * 3),
+			7,
+			raw[i],
+			1,
+			FONT_LIGHT_BLUE,
+			false
+		);
+	}
+
+	print(2, 20,
+		(const unsigned char*)"B: Back",
+		FONT_LIGHT_GRAY,
+		false);
+
+	waitKeys(KEY_B);
+
+	// Don't let the B press fall through into the RAM viewer
+	// and immediately back us out of that as well.
+	do {
+		while (REG_VCOUNT != 191) mySwiDelay(100);
+		while (REG_VCOUNT == 191) mySwiDelay(100);
+	} while (KEYS & KEY_B);
+
+	clearScreen(false);
+}
+
 static void ramViewer(void) {
 	clearScreen(false);
 	(*changeMpu)();
@@ -752,7 +811,8 @@ static void ramViewer(void) {
 			BG_MAP_RAM_SUB(15)[loc] = (BG_MAP_RAM_SUB(15)[loc] & ~(0xF << 12)) | (3 + mode) << 12;
 		}
 
-		waitKeys(KEY_UP | KEY_DOWN | KEY_LEFT | KEY_RIGHT | KEY_A | KEY_B | KEY_Y | KEY_SELECT);
+		waitKeys(KEY_UP | KEY_DOWN | KEY_LEFT | KEY_RIGHT |
+	KEY_A | KEY_B | KEY_X | KEY_Y | KEY_SELECT);
 
 		if(mode == 0) {
 			if(KEYS & KEY_R && KEYS & (KEY_UP | KEY_DOWN | KEY_LEFT | KEY_RIGHT)) {
@@ -786,11 +846,15 @@ static void ramViewer(void) {
 					mode = 1;
 				} else if (KEYS & KEY_B) {
 					return;
+				} else if(KEYS & KEY_X) {
+					platinumRngViewer();
+					clearScreen(false);
+					ramLoaded = false;
 				} else if(KEYS & KEY_Y) {
 					jumpToAddress();
 					clearScreen(false);
 					ramLoaded = false;
-				}else if (KEYS & KEY_SELECT) {
+				} else if (KEYS & KEY_SELECT) {
 					arm7Ram = !arm7Ram;
 					ramLoaded = false;
 				}

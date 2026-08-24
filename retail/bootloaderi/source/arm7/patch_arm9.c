@@ -3350,7 +3350,7 @@ u32 patchCardNdsArm9(cardengineArm9* ce9, const tNDSHeader* ndsHeader, const mod
 		patchMobiclipFrameDraw(ndsHeader, moduleParams);
 	}
 
-	patchPlatinumPauseGate(ce9, ndsHeader);
+	//patchPlatinumPauseGate(ce9, ndsHeader);
 
 
 	dbg_printf("ERR_NONE\n\n");

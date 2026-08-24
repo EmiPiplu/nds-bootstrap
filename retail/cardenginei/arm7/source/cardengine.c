@@ -1960,8 +1960,8 @@ void myIrqHandlerVBlank(void) {
 	#ifdef DEBUG		
 	nocashMessage("myIrqHandlerVBlank");
 	#endif	
-	//trackPlatinumInitialSeed();
-	trackPlatinumDebugControls();
+	trackPlatinumInitialSeed();
+	//trackPlatinumDebugControls();
 	if (valueBits & i2cBricked) {
 		REG_MASTER_VOLUME = noI2CVolLevel;
 	}

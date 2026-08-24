@@ -211,7 +211,6 @@ needFlushDCCache:
 #endif
 .word   vcountHandler
 .word   ipcSyncHandler
-.word   platinumSeedCaptureHook
 thumbPatches:
 .word	thumb_card_read_arm9
 .word	thumb_card_irq_enable
@@ -757,26 +756,7 @@ getDtcmBase:
 
 
 //---------------------------------------------------------------------------------
-@---------------------------------------------------------------------------------
-@ Platinum initial RNG seed observer
-@ r0 = seed passed by Platinum to LCRNG_SetSeed
-@---------------------------------------------------------------------------------
-.global platinumSeedCaptureHook
-platinumSeedCaptureHook:
-	ldr     r1, =sharedAddr
-	ldr     r1, [r1]
 
-	@ Store seed first
-	str     r0, [r1, #40]       @ sharedAddr[10]
-
-	@ Then mark it valid
-	ldr     r2, =0x50474E52     @ "RNGP"
-	str     r2, [r1, #36]       @ sharedAddr[9]
-
-	@ Tail-call Platinum's ORIGINAL LCRNG_SetSeed.
-	@ LR still contains the caller's return address.
-	ldr     pc, =0x0201D2DC
-.pool
 
 .global  IC_InvalidateAll
 .type	 IC_InvalidateAll STT_FUNC

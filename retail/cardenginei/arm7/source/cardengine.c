@@ -86,8 +86,16 @@
 #define	REG_EXTKEYINPUT	(*(vuint16*)0x04000136)
 #define	REG_WIFIIRQ	(*(vuint16*)0x04808012)
 
+#define PLATINUM_MT_INDEX_ADDR 0x02100834
+#define PLATINUM_MT0_ADDR      0x021BFB18
 
+#define PLATINUM_RNG_MAGIC     0x50474E52 // "RNGP"
 
+#define PLATINUM_SHARED_MAGIC  9
+#define PLATINUM_SHARED_SEED   10
+#define PLATINUM_SHARED_COUNT  11
+
+static bool platinumRngTrackerInitialized = false;
 
 extern u32 ce7;
 
@@ -217,6 +225,45 @@ u32 currentSrlAddr = 0;
 
 void i2cIRQHandler(void);
 
+static inline void trackPlatinumInitialSeed(void) {
+	if (!platinumRngTrackerInitialized) {
+		sharedAddr[PLATINUM_SHARED_MAGIC] = 0;
+		sharedAddr[PLATINUM_SHARED_SEED] = 0;
+		sharedAddr[PLATINUM_SHARED_COUNT] = 0;
+
+		platinumRngTrackerInitialized = true;
+	}
+
+	u32 mtIndex = *(vu32*)PLATINUM_MT_INDEX_ADDR;
+
+	/*
+	 * Platinum's MTRNG starts at index 625.
+	 *
+	 * MTRNG_SetSeed(seed) fills the 624-word state array and
+	 * leaves the index at exactly 624.
+	 *
+	 * Therefore while index == 624, MT[0] is still the exact
+	 * seed supplied to MTRNG_SetSeed() by InitRNG().
+	 */
+	if (mtIndex != 624) {
+		return;
+	}
+
+	u32 seed = *(vu32*)PLATINUM_MT0_ADDR;
+
+	/*
+	 * Re-copy if InitRNG() has produced a new seed.
+	 * This naturally handles the reseed when loading a save.
+	 */
+	if (sharedAddr[PLATINUM_SHARED_MAGIC] != PLATINUM_RNG_MAGIC
+	 || sharedAddr[PLATINUM_SHARED_SEED] != seed) {
+
+		// Seed first, validity marker last.
+		sharedAddr[PLATINUM_SHARED_SEED] = seed;
+		sharedAddr[PLATINUM_SHARED_COUNT]++;
+		sharedAddr[PLATINUM_SHARED_MAGIC] = PLATINUM_RNG_MAGIC;
+	}
+}
 
 static void unlaunchSetFilename(void) {
 	const u8* filename = 
@@ -1829,7 +1876,7 @@ void myIrqHandlerVBlank(void) {
 	#ifdef DEBUG		
 	nocashMessage("myIrqHandlerVBlank");
 	#endif	
-
+	trackPlatinumInitialSeed();
 	if (valueBits & i2cBricked) {
 		REG_MASTER_VOLUME = noI2CVolLevel;
 	}

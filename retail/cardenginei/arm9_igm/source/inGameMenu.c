@@ -710,8 +710,6 @@ static void jumpToAddress(void) {
 #define PLATINUM_SHARED_SEED  10
 #define PLATINUM_SHARED_COUNT 11
 
-static bool platinumRngBaseSet = false;
-static u32 platinumRngBase = 0;
 
 static u32 platinumRngNext(u32 seed) {
 	return seed * 0x41C64E6D + 0x6073;
@@ -817,25 +815,39 @@ static void platinumRngViewer(void) {
 				false);
 		}
 
+		print(2, 11,
+			(const unsigned char*)"MT INDEX:",
+			FONT_LIGHT_GRAY,
+			false);
+
+		printDec(
+			12, 11,
+			*(vu32*)PLATINUM_MT_INDEX_ADDR,
+			3,
+			FONT_LIGHT_BLUE,
+			false);
+
+		print(2, 13,
+			(const unsigned char*)"CAPTURES:",
+			FONT_LIGHT_GRAY,
+			false);
+
+		printDec(
+			12, 13,
+			sharedAddr[PLATINUM_SHARED_COUNT],
+			3,
+			FONT_LIGHT_BLUE,
+			false);
+
 
 		print(2, 20,
 			(const unsigned char*)"B: Back",
 			FONT_LIGHT_GRAY,
 			false);
 
-		waitKeys(KEY_X | KEY_B);
+		waitKeys(KEY_B);
 
-		if (KEYS & KEY_X) {
-			platinumRngBase = *(vu32*)PLATINUM_RNG_ADDR;
-			platinumRngBaseSet = true;
-
-			// Wait for X release.
-			do {
-				while (REG_VCOUNT != 191) mySwiDelay(100);
-				while (REG_VCOUNT == 191) mySwiDelay(100);
-			} while (KEYS & KEY_X);
-
-		} else if (KEYS & KEY_B) {
+		if (KEYS & KEY_B) {
 			// Don't pass B back into ramViewer().
 			do {
 				while (REG_VCOUNT != 191) mySwiDelay(100);

@@ -462,6 +462,8 @@ static bool patchCardId(cardengineArm9* ce9, const tNDSHeader* ndsHeader, const 
 	return true;
 }
 
+
+
 static void patchPlatinumPauseGate(
 	cardengineArm9 *ce9,
 	const tNDSHeader *ndsHeader
@@ -475,45 +477,56 @@ static void patchPlatinumPauseGate(
 	/*
 	 * English Platinum:
 	 *
-	 * NitroMain:
-	 *     02000C88 - 02000E3C   (THUMB)
-	 *
 	 * ReadKeypadAndTouchpad:
-	 *     02017B9C               (THUMB)
+	 *   02017B9C  B510    push {r4, lr}
+	 *   02017B9E  B084    sub  sp, #16
+	 *   02017BA0  4A39    ldr  r2, [pc, #0xE4]
+	 *   02017BA2  2002    movs r0, #2
+	 *
+	 * Replace those 8 bytes with:
+	 *
+	 *   ldr r3, [pc, #0]
+	 *   bx  r3
+	 *   .word platinumPauseGate | 1
+	 *
+	 * The original prologue is replayed by
+	 * platinumReadInputOriginal().
 	 */
-	u16 *start = (u16 *)0x02000C88;
-	u16 *end   = (u16 *)0x02000E3C;
+	u16 *readInput = (u16 *)0x02017B9C;
 
-	for (u16 *p = start; p + 1 < end; p++) {
-		/*
-		 * ARMv5 Thumb BL:
-		 *
-		 * first halfword  = 11110...
-		 * second halfword = 11111...
-		 */
-		if ((p[0] & 0xF800) != 0xF000) {
-			continue;
-		}
-
-		if ((p[1] & 0xF800) != 0xF800) {
-			continue;
-		}
-
-		if ((u32)getOffsetFromBLThumb(p) == 0x02017B9C) {
-			setBLThumb(
-				(u32)p,
-				((u32)ce9->patches->platinumPauseGate) & ~1u
-			);
-
-			dbg_printf("Platinum pause gate patched at: ");
-			dbg_hexa((u32)p);
-			dbg_printf("\n\n");
-
-			return;
-		}
+	/*
+	 * Refuse to patch if this isn't the exact function/revision
+	 * we expect.
+	 */
+	if (
+		readInput[0] != 0xB510 ||
+		readInput[1] != 0xB084 ||
+		readInput[2] != 0x4A39 ||
+		readInput[3] != 0x2002
+	) {
+		dbg_printf("Platinum pause gate: unexpected ReadInput prologue\n\n");
+		return;
 	}
 
-	dbg_printf("Platinum pause gate NOT FOUND\n\n");
+	u32 target =
+		((u32)ce9->patches->platinumPauseGate) | 1u;
+
+	/*
+	 * 4B00 = ldr r3, [pc, #0]
+	 * 4718 = bx  r3
+	 *
+	 * At 02017B9C, Thumb PC for the LDR is 02017BA0,
+	 * which is exactly where our literal lives.
+	 */
+	readInput[0] = 0x4B00;
+	readInput[1] = 0x4718;
+	*(u32 *)&readInput[2] = target;
+
+	dbg_printf("Platinum pause gate installed at ReadInput: ");
+	dbg_hexa((u32)readInput);
+	dbg_printf("\nTarget: ");
+	dbg_hexa(target);
+	dbg_printf("\n\n");
 }
 
 void patchGbaSlotInit_cont(const tNDSHeader* ndsHeader, bool usesThumb, bool searchAgainForThumb) {
@@ -3350,7 +3363,7 @@ u32 patchCardNdsArm9(cardengineArm9* ce9, const tNDSHeader* ndsHeader, const mod
 		patchMobiclipFrameDraw(ndsHeader, moduleParams);
 	}
 
-	//patchPlatinumPauseGate(ce9, ndsHeader);
+	patchPlatinumPauseGate(ce9, ndsHeader);
 
 
 	dbg_printf("ERR_NONE\n\n");

@@ -180,37 +180,57 @@ extern void waitFrames(int count);
 	}
 }*/
 
+__attribute__((naked, noinline))
+static void platinumReadInputOriginal(void) {
+	__asm__ volatile(
+		/*
+		 * Reproduce the four instructions overwritten at
+		 * 02017B9C-02017BA3.
+		 */
+		"push {r4, lr}\n"
+		"sub sp, #16\n"
+
+		/*
+		 * Original 4A39 loaded the word at 02017C88,
+		 * which is 027FFFA8.
+		 */
+		"ldr r2, 1f\n"
+		"movs r0, #2\n"
+
+		/*
+		 * Continue immediately after the overwritten prologue.
+		 * Bit 0 is set because the destination is Thumb.
+		 */
+		"ldr r3, 2f\n"
+		"bx r3\n"
+
+		".align 2\n"
+		"1: .word 0x027FFFA8\n"
+		"2: .word 0x02017BA5\n"
+	);
+}
+
 void platinumPauseGate(void) {
-	typedef void (*PlatinumReadInputFunc)(void);
-
-	PlatinumReadInputFunc readInput =
-	(PlatinumReadInputFunc)(PLATINUM_READ_INPUT_ADDR | 1);
-
 	/*
 	 * Normal case: essentially zero debugger overhead.
 	 */
 	if (!(sharedAddr[PLATINUM_SHARED_CONTROL] & PLAT_CTRL_ACTIVE)) {
-		readInput();
+		platinumReadInputOriginal();
 		return;
 	}
 
 	/*
-	 * Freeze ARM9 completely while waiting for ARM7 to tell us
-	 * either STEP or RUN.
-	 *
-	 * ARM7 remains alive and continues polling the physical buttons.
+	 * Freeze ARM9 completely while waiting for ARM7.
 	 */
 	int oldIME = enterCriticalSection();
 
 	sharedAddr[PLATINUM_SHARED_CONTROL] |= PLAT_CTRL_BLOCKED;
 
 	while (1) {
-		u32 control = sharedAddr[PLATINUM_SHARED_CONTROL];
+		u32 control =
+			sharedAddr[PLATINUM_SHARED_CONTROL];
 
 		if (control & PLAT_CTRL_RUN) {
-			/*
-			 * Resume normal execution.
-			 */
 			control &= ~(
 				PLAT_CTRL_ACTIVE |
 				PLAT_CTRL_RUN |
@@ -218,29 +238,27 @@ void platinumPauseGate(void) {
 				PLAT_CTRL_BLOCKED
 			);
 
-			sharedAddr[PLATINUM_SHARED_CONTROL] = control;
+			sharedAddr[PLATINUM_SHARED_CONTROL] =
+				control;
 
 			leaveCriticalSection(oldIME);
 
-			readInput();
+			platinumReadInputOriginal();
 			return;
 		}
 
 		if (control & PLAT_CTRL_STEP) {
-			/*
-			 * Run exactly one main-loop iteration.
-			 *
-			 * ACTIVE deliberately remains set, so when NitroMain
-			 * reaches us again on the next iteration it freezes
-			 * again.
-			 */
-			control &= ~(PLAT_CTRL_STEP | PLAT_CTRL_BLOCKED);
+			control &= ~(
+				PLAT_CTRL_STEP |
+				PLAT_CTRL_BLOCKED
+			);
 
-			sharedAddr[PLATINUM_SHARED_CONTROL] = control;
+			sharedAddr[PLATINUM_SHARED_CONTROL] =
+				control;
 
 			leaveCriticalSection(oldIME);
 
-			readInput();
+			platinumReadInputOriginal();
 			return;
 		}
 

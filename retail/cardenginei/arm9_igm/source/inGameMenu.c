@@ -714,11 +714,6 @@ static void jumpToAddress(void) {
 
 #define PLATINUM_RNG_MAGIC     0x50474E52 // "RNGP"
 
-
-
-static bool platinumRngTrackerInitialized = false;
-
-
 static u32 platinumRngNext(u32 seed) {
 	return seed * 0x41C64E6D + 0x6073;
 }
@@ -740,6 +735,106 @@ static u32 platinumRngDistance(u32 state, u32 target) {
 	}
 
 	return distance;
+}
+
+#define PLATINUM_TARGET_SEARCH_MAX 200000
+
+/*
+ * Current save:
+ * TID 38543 / SID 38540
+ *
+ * Shiny check only needs TID ^ SID.
+ * We can make this dynamically read TrainerInfo later.
+ */
+#define PLATINUM_TID 38543
+#define PLATINUM_SID 38540
+#define PLATINUM_TRAINER_XOR ((u16)(PLATINUM_TID ^ PLATINUM_SID))
+
+typedef enum {
+	PLATINUM_TARGET_GIFT = 0,
+} PlatinumTargetMethod;
+
+typedef struct {
+	bool found;
+
+	/*
+	 * LCRNG advance of the state immediately BEFORE
+	 * the first PID-generation call.
+	 */
+	u32 startAdvance;
+
+	/*
+	 * Number of LCRNG calls between the current state
+	 * and startAdvance.
+	 */
+	u32 callsAway;
+
+	u32 pid;
+} PlatinumShinyTarget;
+
+static bool platinumPidIsShiny(u32 pid, u16 trainerXor) {
+	u16 pidLow = (u16)(pid & 0xFFFF);
+	u16 pidHigh = (u16)(pid >> 16);
+
+	return (trainerXor ^ pidLow ^ pidHigh) < 8;
+}
+
+static PlatinumShinyTarget platinumFindNextGiftShiny(
+	u32 currentState,
+	u32 currentAdvance,
+	u16 trainerXor
+) {
+	PlatinumShinyTarget result = {
+		.found = false,
+		.startAdvance = 0,
+		.callsAway = 0,
+		.pid = 0
+	};
+
+	u32 state = currentState;
+
+	for (u32 offset = 0;
+	     offset < PLATINUM_TARGET_SEARCH_MAX;
+	     offset++) {
+
+		/*
+		 * Pokemon_InitWith():
+		 *
+		 * personality =
+		 *     LCRNG_Next()
+		 *   | LCRNG_Next() << 16;
+		 *
+		 * LCRNG_Next() returns the upper 16 bits of
+		 * the newly advanced 32-bit state.
+		 */
+
+		u32 state1 = platinumRngNext(state);
+		u16 pidLow = state1 >> 16;
+
+		u32 state2 = platinumRngNext(state1);
+		u16 pidHigh = state2 >> 16;
+
+		u32 pid =
+			(u32)pidLow |
+			((u32)pidHigh << 16);
+
+		if (platinumPidIsShiny(pid, trainerXor)) {
+			result.found = true;
+			result.startAdvance = currentAdvance + offset;
+			result.callsAway = offset;
+			result.pid = pid;
+
+			return result;
+		}
+
+		/*
+		 * Slide the possible PID-generation window
+		 * forward by exactly one LCRNG call.
+		 */
+		state = state1;
+	}
+
+	return result;
 }
 
 static void platinumRngViewer(void) {
@@ -764,6 +859,21 @@ static void platinumRngViewer(void) {
 
 		if (haveInitialSeed) {
 			advances = platinumRngDistance(initial, current);
+		}
+
+		PlatinumShinyTarget target = {
+			.found = false,
+			.startAdvance = 0,
+			.callsAway = 0,
+			.pid = 0
+		};
+
+		if (haveInitialSeed) {
+			target = platinumFindNextGiftShiny(
+				current,
+				advances,
+				PLATINUM_TRAINER_XOR
+			);
 		}
 
 		print(2, 2,
@@ -824,29 +934,77 @@ static void platinumRngViewer(void) {
 		}
 
 		print(2, 11,
-			(const unsigned char*)"MT INDEX:",
+			(const unsigned char*)"METHOD:",
 			FONT_LIGHT_GRAY,
 			false);
 
-		printDec(
-			12, 11,
-			*(vu32*)PLATINUM_MT_INDEX_ADDR,
-			3,
+		print(12, 11,
+			(const unsigned char*)"GIFT",
 			FONT_LIGHT_BLUE,
 			false);
+
 
 		print(2, 13,
-			(const unsigned char*)"CAPTURES:",
+			(const unsigned char*)"NEXT:",
 			FONT_LIGHT_GRAY,
 			false);
 
-		printDec(
-			12, 13,
-			sharedAddr[PLATINUM_SHARED_COUNT],
-			3,
-			FONT_LIGHT_BLUE,
+		if (target.found) {
+			printDec(
+				12, 13,
+				target.startAdvance,
+				10,
+				FONT_LIME,
+				false);
+		} else {
+			print(
+				12, 13,
+				(const unsigned char*)"----------",
+				FONT_RED,
+				false);
+		}
+
+
+		print(2, 15,
+			(const unsigned char*)"IN:",
+			FONT_LIGHT_GRAY,
 			false);
 
+		if (target.found) {
+			printDec(
+				12, 15,
+				target.callsAway,
+				10,
+				FONT_LIME,
+				false);
+		} else {
+			print(
+				12, 15,
+				(const unsigned char*)"----------",
+				FONT_RED,
+				false);
+		}
+
+
+		print(2, 17,
+			(const unsigned char*)"PID:",
+			FONT_LIGHT_GRAY,
+			false);
+
+		if (target.found) {
+			printHex(
+				12, 17,
+				target.pid,
+				4,
+				FONT_LIGHT_BLUE,
+				false);
+		} else {
+			print(
+				12, 17,
+				(const unsigned char*)"--------",
+				FONT_RED,
+				false);
+		}
 
 		print(2, 20,
 			(const unsigned char*)"B: Back",

@@ -3147,6 +3147,37 @@ static void operaRamPatch(void) {
 	ce9->patches->needFlushDCCache = (patchMpuRegion == 1);
 }*/
 
+static void patchPlatinumRngCapture(
+	cardengineArm9 *ce9,
+	const tNDSHeader *ndsHeader
+) {
+	const char *tid = getRomTid(ndsHeader);
+
+	// Pokemon Platinum USA only for now.
+	if (strncmp(tid, "CPUE", 4) != 0) {
+		return;
+	}
+
+	u32 *start = (u32 *)0x02001034;
+	u32 *end   = (u32 *)0x02001134;
+
+	for (u32 *p = start; p < end; p++) {
+		// ARM BL
+		if ((*p & 0xFF000000) != 0xEB000000) {
+			continue;
+		}
+
+		if (getOffsetFromBL(p) == (u32 *)0x0201D2DC) {
+			setBL(
+				(u32)p,
+				(u32)ce9->patches->platinumSeedCaptureHook
+			);
+			break;
+		}
+	}
+}
+
+
 u32 patchCardNdsArm9(cardengineArm9* ce9, const tNDSHeader* ndsHeader, const module_params_t* moduleParams, const ltd_module_params_t* ltdModuleParams, u32 ROMinRAM, u32 patchMpuRegion, const bool usesCloneboot, const bool buttonsRemapped) {
 
 	bool usesThumb;
@@ -3291,6 +3322,8 @@ u32 patchCardNdsArm9(cardengineArm9* ce9, const tNDSHeader* ndsHeader, const mod
 	if (colorLutEnabled) {
 		patchMobiclipFrameDraw(ndsHeader, moduleParams);
 	}
+
+	patchPlatinumRngCapture(ce9, ndsHeader);
 
 	dbg_printf("ERR_NONE\n\n");
 	return ERR_NONE;

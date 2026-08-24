@@ -46,6 +46,7 @@ typedef struct cardengineArm9Patches {
 	u32* gsdd_fix;
 	u32* vcountHandlerRef;
 	u32* ipcSyncHandlerRef;
+	u32* platinumSeedCaptureHook;
 } cardengineArm9Patches;
 
 

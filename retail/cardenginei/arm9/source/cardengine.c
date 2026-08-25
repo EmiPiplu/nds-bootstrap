@@ -190,6 +190,10 @@ extern void waitFrames(int count);
 	}
 }*/
 
+#pragma GCC push_options
+#pragma GCC optimize ("Os")
+
+
 __attribute__((naked, noinline))
 static u32 platinumReadInputOriginal(void) {
 	__asm__ volatile(
@@ -328,52 +332,30 @@ static u32 platinumPauseGateImpl(u32 callerLr) {
 	platinumShowPauseHud();
 
 	while (1) {
-
-		/*
-		* Once ARM9 is parked, poll the physical keypad directly.
-		*
-		* This avoids depending on ARM7/shared IPC for STEP/RUN while
-		* frozen. Wait for release so the key doesn't leak into Platinum
-		* when we return through UpdateInput().
-		*/
 		u16 keys = (~REG_KEYINPUT) & 0x03FF;
 
-		if (keys & KEY_START) {
-			while (((~REG_KEYINPUT) & 0x03FF) & KEY_START) {
-				swiDelay(100);
-			}
-
-			sharedAddr[PLATINUM_SHARED_CONTROL] |=
-				PLAT_CTRL_RUN;
-		}
-
-		if (keys & KEY_R) {
-			while (((~REG_KEYINPUT) & 0x03FF) & KEY_R) {
-				swiDelay(100);
-			}
-
-			sharedAddr[PLATINUM_SHARED_CONTROL] |=
-				PLAT_CTRL_STEP;
-		}
-
-		u32 control =
-			sharedAddr[PLATINUM_SHARED_CONTROL];
-
 		/*
-		 * Resume normal execution.
-		 */
-		if (control & PLAT_CTRL_RUN) {
+		* START: resume.
+		*
+		* Wait for release before returning to Platinum so the
+		* debugger key cannot leak into the game.
+		*/
+		if (keys & KEY_START) {
+			do {
+				swiDelay(100);
+			} while (
+				((~REG_KEYINPUT) & 0x03FF) &
+				KEY_START
+			);
+
 			platinumHudLeave();
 
-			control &= ~(
+			sharedAddr[PLATINUM_SHARED_CONTROL] &= ~(
 				PLAT_CTRL_ACTIVE |
 				PLAT_CTRL_RUN |
 				PLAT_CTRL_STEP |
 				PLAT_CTRL_BLOCKED
 			);
-
-			sharedAddr[PLATINUM_SHARED_CONTROL] =
-				control;
 
 			leaveCriticalSection(oldIME);
 
@@ -381,22 +363,22 @@ static u32 platinumPauseGateImpl(u32 callerLr) {
 		}
 
 		/*
-		 * Permit one NitroMain iteration.
-		 *
-		 * ACTIVE deliberately remains set. When NitroMain
-		 * returns to its UpdateInput call on the next loop,
-		 * we'll block again.
-		 */
-		if (control & PLAT_CTRL_STEP) {
+		* R: permit one NitroMain iteration.
+		*/
+		if (keys & KEY_R) {
+			do {
+				swiDelay(100);
+			} while (
+				((~REG_KEYINPUT) & 0x03FF) &
+				KEY_R
+			);
+
 			platinumHudLeave();
 
-			control &= ~(
+			sharedAddr[PLATINUM_SHARED_CONTROL] &= ~(
 				PLAT_CTRL_STEP |
 				PLAT_CTRL_BLOCKED
 			);
-
-			sharedAddr[PLATINUM_SHARED_CONTROL] =
-				control;
 
 			leaveCriticalSection(oldIME);
 
@@ -440,6 +422,8 @@ u32 platinumPauseGate(void) {
 		"pop {r3, pc}\n"
 	);
 }
+
+#pragma GCC pop_options
 
 #ifndef DLDI
 static bool inline asyncDataAvailable(u32 src) {

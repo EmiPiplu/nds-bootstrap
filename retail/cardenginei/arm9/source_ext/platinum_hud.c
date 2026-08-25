@@ -1,3 +1,5 @@
+#pragma GCC optimize ("Os")
+
 #include "platinum_hud.h"
 
 #include <nds/ndstypes.h>

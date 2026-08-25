@@ -252,25 +252,6 @@ static void platinumHudPrintHex(
 	}
 }
 
-
-static void platinumHudPrintDec(
-	int x,
-	int y,
-	u32 value,
-	int digits
-) {
-	for (int i = digits - 1; i >= 0; i--) {
-		platinumHudPutChar(
-			x + i,
-			y,
-			'0' + (value % 10)
-		);
-
-		value /= 10;
-	}
-}
-
-
 static void platinumHudDraw(
 	u32 currentRng,
 	bool haveInitialSeed,
@@ -320,11 +301,10 @@ static void platinumHudDraw(
 			"ADV"
 		);
 
-		platinumHudPrintDec(
+		platinumHudPrintHex(
 			10,
 			12,
-			advances,
-			10
+			advances
 		);
 	} else {
 		platinumHudPrint(

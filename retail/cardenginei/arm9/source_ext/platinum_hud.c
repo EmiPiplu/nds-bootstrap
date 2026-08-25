@@ -3,6 +3,7 @@
 #include <nds/ndstypes.h>
 #include <nds/arm9/background.h>
 #include <nds/arm9/video.h>
+#include <nds/system.h>
 
 #include "locations.h"
 #include "tonccpy.h"
@@ -72,6 +73,7 @@ typedef struct {
 	u16 palette1;
 
 	u16 masterBright;
+	u16 powercnt;
 } PlatinumHudState;
 
 
@@ -389,7 +391,10 @@ void platinumHudEnter(
 		VRAM_H_CR;
 
 	platinumHudState.masterBright =
-		*(vu16 *)0x0400106C;
+    *(vu16 *)0x0400106C;
+
+	platinumHudState.powercnt =
+		REG_POWERCNT;
 
 	/*
 	 * Match the IGM's known-working VRAM arrangement.
@@ -458,10 +463,20 @@ void platinumHudEnter(
 	BG_PALETTE_SUB[1] = 0x7FFF;
 
 	/*
-	 * Disable any game master-brightness effect while the HUD
-	 * is visible. We'll restore it exactly on exit.
-	 */
+	* Match the real nds-bootstrap IGM display setup.
+	*
+	* Platinum may have blending/fade state active on the sub engine.
+	* If we leave that state intact, our BG3 text can be rendered
+	* correctly but then blended completely to black.
+	*/
+	REG_POWERCNT |= POWER_SWAP_LCDS;
+
 	*(vu16 *)0x0400106C = 0;
+
+	REG_MOSAIC_SUB = 0;
+	REG_BLDCNT_SUB = 0;
+	REG_BLDALPHA_SUB = 0;
+	REG_BLDY_SUB = 0;
 
 	platinumHudBuildFont();
 
@@ -539,6 +554,9 @@ void platinumHudLeave(void) {
 
 	*(vu16 *)0x0400106C =
 		platinumHudState.masterBright;
+
+	REG_POWERCNT =
+    	platinumHudState.powercnt;
 
 	platinumHudState.active = false;
 }

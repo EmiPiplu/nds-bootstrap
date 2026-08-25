@@ -25,6 +25,7 @@
 #include <nds/system.h>
 #include <nds/dma.h>
 #include <nds/interrupts.h>
+#include <nds/input.h>
 #include <nds/ipc.h>
 #include <nds/timers.h>
 #include <nds/fifomessages.h>
@@ -327,6 +328,34 @@ static u32 platinumPauseGateImpl(u32 callerLr) {
 	platinumShowPauseHud();
 
 	while (1) {
+
+		/*
+		* Once ARM9 is parked, poll the physical keypad directly.
+		*
+		* This avoids depending on ARM7/shared IPC for STEP/RUN while
+		* frozen. Wait for release so the key doesn't leak into Platinum
+		* when we return through UpdateInput().
+		*/
+		u16 keys = (~REG_KEYINPUT) & 0x03FF;
+
+		if (keys & KEY_START) {
+			while (((~REG_KEYINPUT) & 0x03FF) & KEY_START) {
+				swiDelay(100);
+			}
+
+			sharedAddr[PLATINUM_SHARED_CONTROL] |=
+				PLAT_CTRL_RUN;
+		}
+
+		if (keys & KEY_R) {
+			while (((~REG_KEYINPUT) & 0x03FF) & KEY_R) {
+				swiDelay(100);
+			}
+
+			sharedAddr[PLATINUM_SHARED_CONTROL] |=
+				PLAT_CTRL_STEP;
+		}
+
 		u32 control =
 			sharedAddr[PLATINUM_SHARED_CONTROL];
 

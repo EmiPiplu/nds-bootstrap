@@ -64,6 +64,8 @@
 #include "card.h"
 //#endif
 
+#include "platinum_hud.h"
+
 #define _16KB_READ_SIZE  0x4000
 #define _32KB_READ_SIZE  0x8000
 #define _64KB_READ_SIZE  0x10000
@@ -83,7 +85,13 @@
 #define END_FLAG   0
 #define BUSY_FLAG   4
 
+#define PLATINUM_RNG_ADDR 0x021BFB14
+
+#define PLATINUM_SHARED_MAGIC 9
+#define PLATINUM_SHARED_SEED  10
 #define PLATINUM_SHARED_CONTROL 12
+
+#define PLATINUM_RNG_MAGIC 0x50474E52
 
 #define PLAT_CTRL_ACTIVE  BIT(0)
 #define PLAT_CTRL_STEP    BIT(1)
@@ -218,6 +226,64 @@ static u32 platinumReadInputOriginal(void) {
 	);
 }
 
+static u32 platinumRngDistance(
+	u32 state,
+	u32 target
+) {
+	u32 curMult = 0x41C64E6D;
+	u32 curPlus = 0x6073;
+	u32 distance = 0;
+
+	for (u32 bit = 1;
+	     bit != 0;
+	     bit <<= 1) {
+
+		if ((state & bit) !=
+		    (target & bit)) {
+
+			state =
+				state * curMult +
+				curPlus;
+
+			distance |= bit;
+		}
+
+		curPlus *= curMult + 1;
+		curMult *= curMult;
+	}
+
+	return distance;
+}
+
+static void platinumShowPauseHud(void) {
+	u32 current =
+		*(vu32 *)PLATINUM_RNG_ADDR;
+
+	bool haveInitialSeed =
+		sharedAddr[PLATINUM_SHARED_MAGIC] ==
+			PLATINUM_RNG_MAGIC;
+
+	u32 initialSeed = 0;
+	u32 advances = 0;
+
+	if (haveInitialSeed) {
+		initialSeed =
+			sharedAddr[PLATINUM_SHARED_SEED];
+
+		advances =
+			platinumRngDistance(
+				initialSeed,
+				current
+			);
+	}
+
+	platinumHudEnter(
+		current,
+		haveInitialSeed,
+		initialSeed,
+		advances
+	);
+}
 
 /*
  * Normal C implementation of the debugger gate.
@@ -249,14 +315,16 @@ static u32 platinumPauseGateImpl(u32 callerLr) {
 		return platinumReadInputOriginal();
 	}
 
-	/*
-	 * We are at the intended NitroMain frame boundary and
-	 * debugger pause mode is active.
-	 */
 	int oldIME = enterCriticalSection();
 
 	sharedAddr[PLATINUM_SHARED_CONTROL] |=
 		PLAT_CTRL_BLOCKED;
+
+	/*
+	* ARM9 is now parked at our safe NitroMain boundary.
+	* Replace Platinum's bottom screen with debugger telemetry.
+	*/
+	platinumShowPauseHud();
 
 	while (1) {
 		u32 control =
@@ -266,6 +334,8 @@ static u32 platinumPauseGateImpl(u32 callerLr) {
 		 * Resume normal execution.
 		 */
 		if (control & PLAT_CTRL_RUN) {
+			platinumHudLeave();
+
 			control &= ~(
 				PLAT_CTRL_ACTIVE |
 				PLAT_CTRL_RUN |
@@ -289,6 +359,8 @@ static u32 platinumPauseGateImpl(u32 callerLr) {
 		 * we'll block again.
 		 */
 		if (control & PLAT_CTRL_STEP) {
+			platinumHudLeave();
+
 			control &= ~(
 				PLAT_CTRL_STEP |
 				PLAT_CTRL_BLOCKED

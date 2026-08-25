@@ -23,7 +23,7 @@ endif
 # all directories are relative to this makefile
 #---------------------------------------------------------------------------------
 BUILD		:=	build
-SOURCES		:=	source_ext ../arm9/source ../arm9/source_ext ../../common/source_general
+SOURCES := source_ext ../arm9/source ../../common/source_general
 INCLUDES := ../arm9/include ../../common/include ../../common/include_fat
 DATA		:=	data
 

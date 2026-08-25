@@ -2053,7 +2053,26 @@ void myIrqHandlerVBlank(void) {
 	}
 #endif */
 
-	if ((0 == (REG_KEYINPUT & igmHotkey) && 0 == (REG_EXTKEYINPUT & (((igmHotkey >> 10) & 3) | ((igmHotkey >> 6) & 0xC0))) && (valueBits & igmAccessible) && !wifiIrq) /* || returnToMenu */ || sharedAddr[5] == 0x4C4D4749 /* IGML */) {
+	bool platinumDebuggerBlocked =
+    (sharedAddr[PLATINUM_SHARED_CONTROL] &
+        (PLAT_CTRL_ACTIVE | PLAT_CTRL_BLOCKED))
+    == (PLAT_CTRL_ACTIVE | PLAT_CTRL_BLOCKED);
+
+	if (
+		(
+			!platinumDebuggerBlocked &&
+			0 == (REG_KEYINPUT & igmHotkey) &&
+			0 == (
+				REG_EXTKEYINPUT &
+				(((igmHotkey >> 10) & 3) |
+				((igmHotkey >> 6) & 0xC0))
+			) &&
+			(valueBits & igmAccessible) &&
+			!wifiIrq
+		)
+		||
+		sharedAddr[5] == 0x4C4D4749
+	) {
 		if (tryLockMutex(&saveMutex)) {
 #ifdef TWLSDK
 		igmText = (struct IgmText *)INGAME_MENU_LOCATION;

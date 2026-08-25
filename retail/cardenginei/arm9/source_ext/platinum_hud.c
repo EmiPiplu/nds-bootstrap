@@ -152,14 +152,23 @@ static void platinumHudBuildGlyph(unsigned char c) {
 		return;
 	}
 
-	u8 *tile =
-		((u8 *)BG_GFX_SUB) + (c * 32);
+	/*
+	 * DS VRAM must be written using 16/32-bit accesses.
+	 *
+	 * One 4bpp 8x8 tile:
+	 *   64 pixels * 4 bits = 32 bytes = 16 u16s.
+	 */
+	u16 *tile =
+		BG_GFX_SUB + (c * 16);
 
-	for (int i = 0; i < 32; i++) {
-		tile[i] = 0;
-	}
+	toncset16(
+		tile,
+		0,
+		16
+	);
 
-	const u8 *rows = platinumHudGlyph(c);
+	const u8 *rows =
+		platinumHudGlyph(c);
 
 	for (int y = 0; y < 7; y++) {
 		u8 row = rows[y];
@@ -170,19 +179,20 @@ static void platinumHudBuildGlyph(unsigned char c) {
 			}
 
 			/*
-			 * One blank pixel on the left gives us a
-			 * reasonably centred 5x7 glyph in an 8x8 tile.
+			 * Centre our 5-pixel glyph inside the
+			 * 8-pixel-wide tile.
 			 */
 			int px = x + 1;
 
-			u8 *dst =
-				&tile[(y * 4) + (px >> 1)];
+			/*
+			 * Four 4bpp pixels per u16.
+			 */
+			int pixel = y * 8 + px;
+			int word = pixel >> 2;
+			int shift = (pixel & 3) * 4;
 
-			if (px & 1) {
-				*dst |= 0x10;
-			} else {
-				*dst |= 0x01;
-			}
+			tile[word] |=
+				(u16)(1u << shift);
 		}
 	}
 }

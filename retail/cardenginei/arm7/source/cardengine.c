@@ -251,7 +251,7 @@ static inline void trackPlatinumDebugControls(void) {
 	/*
 	 * Running:
 	 *
-	 * L+R+X, then release the chord, enters debugger pause mode.
+	 * L+R+SELECT, then release the chord, enters debugger pause mode.
 	 * Triggering on RELEASE means the debug keys shouldn't leak
 	 * into the first frozen game frame.
 	 */

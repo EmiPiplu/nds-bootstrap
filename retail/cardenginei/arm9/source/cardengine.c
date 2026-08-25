@@ -91,6 +91,7 @@
 #define PLAT_CTRL_BLOCKED BIT(3)
 
 #define PLATINUM_READ_INPUT_ADDR 0x02017B9C
+#define PLATINUM_MAIN_INPUT_RETURN 0x02000D91
 
 extern cardengineArm9* volatile ce9;
 
@@ -181,7 +182,7 @@ extern void waitFrames(int count);
 }*/
 
 __attribute__((naked, noinline))
-static void platinumReadInputOriginal(void) {
+static u32 platinumReadInputOriginal(void) {
 	__asm__ volatile(
 		/*
 		 * Reproduce the four instructions overwritten at
@@ -191,15 +192,22 @@ static void platinumReadInputOriginal(void) {
 		"sub sp, #16\n"
 
 		/*
-		 * Original 4A39 loaded the word at 02017C88,
-		 * which is 027FFFA8.
+		 * Original:
+		 *
+		 *   02017BA0  4A39
+		 *
+		 * loaded the word at 02017C88, whose value is
+		 * the shared-input address 027FFFA8.
 		 */
 		"ldr r2, 1f\n"
 		"movs r0, #2\n"
 
 		/*
-		 * Continue immediately after the overwritten prologue.
-		 * Bit 0 is set because the destination is Thumb.
+		 * Resume UpdateInput immediately after the bytes
+		 * replaced by our relay.
+		 *
+		 * Actual address: 02017BA4
+		 * Thumb address:  02017BA5
 		 */
 		"ldr r3, 2f\n"
 		"bx r3\n"
@@ -210,26 +218,53 @@ static void platinumReadInputOriginal(void) {
 	);
 }
 
-void platinumPauseGate(void) {
+
+/*
+ * Normal C implementation of the debugger gate.
+ *
+ * callerLr is the LR that UpdateInput() was entered with.
+ */
+__attribute__((used, noinline, noclone))
+static u32 platinumPauseGateImpl(u32 callerLr) {
 	/*
-	 * Normal case: essentially zero debugger overhead.
+	 * Our relay replaces the entry of UpdateInput(), meaning
+	 * every caller of UpdateInput passes through here.
+	 *
+	 * We only want NitroMain's call at 02000D8C to be a
+	 * debugger/frame boundary.
+	 *
+	 * Any other caller must behave exactly like ordinary
+	 * UpdateInput().
 	 */
-	if (!(sharedAddr[PLATINUM_SHARED_CONTROL] & PLAT_CTRL_ACTIVE)) {
-		platinumReadInputOriginal();
-		return;
+	if (callerLr != PLATINUM_MAIN_INPUT_RETURN) {
+		return platinumReadInputOriginal();
 	}
 
 	/*
-	 * Freeze ARM9 completely while waiting for ARM7.
+	 * NitroMain called us, but the debugger isn't active.
+	 *
+	 * Just run UpdateInput normally.
+	 */
+	if (!(sharedAddr[PLATINUM_SHARED_CONTROL] & PLAT_CTRL_ACTIVE)) {
+		return platinumReadInputOriginal();
+	}
+
+	/*
+	 * We are at the intended NitroMain frame boundary and
+	 * debugger pause mode is active.
 	 */
 	int oldIME = enterCriticalSection();
 
-	sharedAddr[PLATINUM_SHARED_CONTROL] |= PLAT_CTRL_BLOCKED;
+	sharedAddr[PLATINUM_SHARED_CONTROL] |=
+		PLAT_CTRL_BLOCKED;
 
 	while (1) {
 		u32 control =
 			sharedAddr[PLATINUM_SHARED_CONTROL];
 
+		/*
+		 * Resume normal execution.
+		 */
 		if (control & PLAT_CTRL_RUN) {
 			control &= ~(
 				PLAT_CTRL_ACTIVE |
@@ -243,10 +278,16 @@ void platinumPauseGate(void) {
 
 			leaveCriticalSection(oldIME);
 
-			platinumReadInputOriginal();
-			return;
+			return platinumReadInputOriginal();
 		}
 
+		/*
+		 * Permit one NitroMain iteration.
+		 *
+		 * ACTIVE deliberately remains set. When NitroMain
+		 * returns to its UpdateInput call on the next loop,
+		 * we'll block again.
+		 */
 		if (control & PLAT_CTRL_STEP) {
 			control &= ~(
 				PLAT_CTRL_STEP |
@@ -258,12 +299,45 @@ void platinumPauseGate(void) {
 
 			leaveCriticalSection(oldIME);
 
-			platinumReadInputOriginal();
-			return;
+			return platinumReadInputOriginal();
 		}
 
 		swiDelay(100);
 	}
+}
+
+
+/*
+ * Entry point exported through card_engine_header.s.
+ *
+ * The relay at 02017B9C reaches us with BX, so LR still
+ * contains UpdateInput's ORIGINAL caller return address.
+ */
+__attribute__((naked, noinline))
+u32 platinumPauseGate(void) {
+	__asm__ volatile(
+		/*
+		 * Pass original LR as argument 0.
+		 */
+		"mov r0, lr\n"
+
+		/*
+		 * Save the original LR before calling C.
+		 *
+		 * Push two registers instead of only LR so the stack
+		 * remains 8-byte aligned across the C function call.
+		 */
+		"push {r3, lr}\n"
+
+		"bl platinumPauseGateImpl\n"
+
+		/*
+		 * r0 now contains UpdateInput's return value.
+		 *
+		 * Restore the original caller LR directly into PC.
+		 */
+		"pop {r3, pc}\n"
+	);
 }
 
 #ifndef DLDI

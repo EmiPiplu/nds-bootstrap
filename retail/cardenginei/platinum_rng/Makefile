@@ -130,8 +130,8 @@ $(DEPSDIR)/$(TARGET).elf: platinum_rng.ld $(OFILES)
 #	@echo linking $(notdir $@)
 #	@$(LD)  $(LDFLAGS) $(OFILES) $(LIBPATHS) $(LIBS) -o $@
 
-platinum_rng.ld:
-	$(CPP) -P $(INCLUDE) $(CURDIR)/platinum_rng.ld.in $@
+platinum_rng.ld: $(CURDIR)/../platinum_rng.ld.in
+	$(CPP) -P $(INCLUDE) $< $@
 
 
 #---------------------------------------------------------------------------------

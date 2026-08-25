@@ -250,6 +250,48 @@ int runNds(u32 cluster, u32 saveCluster, u32 donorTwlCluster, /* u32 gbaCluster,
 		return 2;
 	}
 
+	/*
+	* Load the experimental Platinum RNG payload into extended RAM.
+	*
+	* It is currently inert unless the Platinum-specific cardengine
+	* hook explicitly calls it.
+	*/
+	if (dsiFeatures() && !conf->b4dsMode) {
+		FILE *rngPayload =
+			fopen("nitro:/platinum_rng.lz77", "rb");
+
+		if (rngPayload) {
+			/*
+			* Zero the entire reservation first.
+			*
+			* Besides giving us deterministic scratch space, this
+			* also initializes .bss, which is not represented in
+			* the raw payload binary.
+			*/
+			toncset(
+				(void *)PLATINUM_RNG_LOCATION,
+				0,
+				PLATINUM_RNG_MAX_SIZE
+			);
+
+			size_t compressedSize = fread(
+				lz77ImageBuffer,
+				1,
+				PLATINUM_RNG_MAX_SIZE,
+				rngPayload
+			);
+
+			fclose(rngPayload);
+
+			if (compressedSize != 0) {
+				LZ77_Decompress(
+					lz77ImageBuffer,
+					(u8 *)PLATINUM_RNG_LOCATION
+				);
+			}
+		}
+	}
+
 	bool altDldi = false;
 
 	if (strcmp(io_dldi_data->friendlyName, "DSTWO(Slot-1)") == 0) {

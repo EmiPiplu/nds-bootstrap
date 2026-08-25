@@ -72,7 +72,7 @@ endif
 export GAME_ICON := $(CURDIR)/$(ASSETS)/icon.bmp
 
 #.PHONY: cardengine_arm7 cardengine_arm9 bootloader BootStrap clean
-.PHONY: all dist release nightly bootloader bootloader2 bootloaderi bootloaderi2 cardengine_arm7 cardengine_arm7_ace3dsp cardengine_arm7_music cardengine_arm9_igm cardengine_arm9_igm_extmem cardengine_arm9 cardengine_arm9_32 cardengine_arm9_start cardengine_arm9_start_foto cardengine_arm9_alt cardengine_arm9_alt_gsdd cardengine_arm9_alt2 cardengine_arm9_alt3 cardengine_arm9_extmem cardengine_arm9_extmem_gsdd cardengine_arm9_extmem_start cardengine_arm9_extmem_foto cardengine_arm9_dldipatcher cardengine_arm9_slot2heap cardenginei_arm7 cardenginei_arm7_alt cardenginei_arm7_twlsdk cardenginei_arm7_twlsdk3 cardenginei_arm7_dsiware cardenginei_arm7_dsiware3 cardenginei_arm7_cheat cardenginei_arm9_colorlut cardenginei_arm9_igm cardenginei_arm9 cardenginei_arm9_gsdd cardenginei_arm9_dldi cardenginei_arm9_gsdd_dldi cardenginei_arm9_twlsdk cardenginei_arm9_twlsdk3 cardenginei_arm9_twlsdk_dldi cardenginei_arm9_twlsdk3_dldi cardenginei_arm9_dsiware cardenginei_arm9_dsiware3 preLoadSettings apfix mobiclipOffsets dsi2dsSavePatches arm7/$(TARGET).elf arm9/$(TARGET).elf clean
+.PHONY: all dist release nightly bootloader bootloader2 bootloaderi bootloaderi2 cardengine_arm7 cardengine_arm7_ace3dsp cardengine_arm7_music cardengine_arm9_igm cardengine_arm9_igm_extmem cardengine_arm9 cardengine_arm9_32 cardengine_arm9_start cardengine_arm9_start_foto cardengine_arm9_alt cardengine_arm9_alt_gsdd cardengine_arm9_alt2 cardengine_arm9_alt3 cardengine_arm9_extmem cardengine_arm9_extmem_gsdd cardengine_arm9_extmem_start cardengine_arm9_extmem_foto cardengine_arm9_dldipatcher cardengine_arm9_slot2heap cardenginei_arm7 cardenginei_arm7_alt cardenginei_arm7_twlsdk cardenginei_arm7_twlsdk3 cardenginei_arm7_dsiware cardenginei_arm7_dsiware3 cardenginei_arm7_cheat cardenginei_arm9_colorlut cardenginei_arm9_igm cardenginei_arm9 cardenginei_arm9_gsdd cardenginei_arm9_dldi cardenginei_arm9_gsdd_dldi cardenginei_arm9_twlsdk cardenginei_arm9_twlsdk3 cardenginei_arm9_twlsdk_dldi cardenginei_arm9_twlsdk3_dldi cardenginei_arm9_dsiware cardenginei_arm9_dsiware3 preLoadSettings apfix mobiclipOffsets dsi2dsSavePatches arm7/$(TARGET).elf arm9/$(TARGET).elf clean cardenginei_platinum_rng
 
 all:	$(OUTPUT)
 
@@ -113,12 +113,15 @@ bootloader2:
 	@$(MAKE) -C bootloader2
 
 #---------------------------------------------------------------------------------		
-bootloaderi: cardenginei_arm7 cardenginei_arm7_alt cardenginei_arm7_twlsdk cardenginei_arm7_twlsdk3 cardenginei_arm7_dsiware cardenginei_arm7_dsiware3 cardenginei_arm7_cheat cardenginei_arm9_colorlut cardenginei_arm9_igm cardenginei_arm9 cardenginei_arm9_gsdd cardenginei_arm9_dldi cardenginei_arm9_gsdd_dldi cardenginei_arm9_twlsdk cardenginei_arm9_twlsdk3 cardenginei_arm9_twlsdk_dldi cardenginei_arm9_twlsdk3_dldi cardenginei_arm9_dsiware cardenginei_arm9_dsiware3
+bootloaderi: cardenginei_arm7 cardenginei_arm7_alt cardenginei_arm7_twlsdk cardenginei_arm7_twlsdk3 cardenginei_arm7_dsiware cardenginei_arm7_dsiware3 cardenginei_arm7_cheat cardenginei_arm9_colorlut cardenginei_arm9_igm cardenginei_arm9 cardenginei_arm9_gsdd cardenginei_arm9_dldi cardenginei_arm9_gsdd_dldi cardenginei_arm9_twlsdk cardenginei_arm9_twlsdk3 cardenginei_arm9_twlsdk_dldi cardenginei_arm9_twlsdk3_dldi cardenginei_arm9_dsiware cardenginei_arm9_dsiware3 cardenginei_platinum_rng
 	@$(MAKE) -C bootloaderi
 
 #---------------------------------------------------------------------------------		
 bootloaderi2:
 	@$(MAKE) -C bootloaderi2
+
+cardenginei_platinum_rng:
+	@$(MAKE) -C cardenginei/platinum_rng
 
 #---------------------------------------------------------------------------------		
 cardengine_arm7:
@@ -341,6 +344,7 @@ clean:
 	@$(MAKE) -C cardenginei/arm9_twlsdk3_dldi clean
 	@$(MAKE) -C cardenginei/arm9_dsiware clean
 	@$(MAKE) -C cardenginei/arm9_dsiware3 clean
+	@$(MAKE) -C cardenginei/platinum_rng clean
 	@rm -f $(NITRODATA)/asyncLoadSettings.pck
 	@rm -f $(NITRODATA)/preLoadSettingsMEP.pck
 	@rm -f $(NITRODATA)/preLoadSettingsDSi.pck

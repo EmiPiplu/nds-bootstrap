@@ -1,0 +1,52 @@
+#include "locations.h"
+
+OUTPUT_FORMAT("elf32-littlearm", "elf32-bigarm", "elf32-littlearm")
+OUTPUT_ARCH(arm)
+
+MEMORY
+{
+	payload :
+		ORIGIN = PLATINUM_RNG_LOCATION,
+		LENGTH = PLATINUM_RNG_MAX_SIZE
+}
+
+SECTIONS
+{
+	.header :
+	{
+		KEEP(*(.header))
+		. = ALIGN(4);
+	} > payload
+
+	.text :
+	{
+		*(.text*)
+		*(.stub)
+		*(.glue_7)
+		*(.glue_7t)
+		. = ALIGN(4);
+	} > payload
+
+	.rodata :
+	{
+		*(.rodata*)
+		. = ALIGN(4);
+	} > payload
+
+	.data :
+	{
+		*(.data*)
+		. = ALIGN(4);
+	} > payload
+
+	.bss (NOLOAD) :
+	{
+		__bss_start = .;
+		*(.bss*)
+		*(COMMON)
+		. = ALIGN(4);
+		__bss_end = .;
+	} > payload
+
+	__payload_end = .;
+}

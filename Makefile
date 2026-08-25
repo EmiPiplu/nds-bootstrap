@@ -6,7 +6,7 @@ PACKAGE		:=	bin
 #---------------------------------------------------------------------------------
 # Goals for Build
 #---------------------------------------------------------------------------------
-.PHONY: all package release nightly retail hb
+.PHONY: all package release nightly retail hb 
 
 all:	retail hb
 

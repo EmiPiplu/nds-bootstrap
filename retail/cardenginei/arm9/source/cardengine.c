@@ -66,6 +66,7 @@
 //#endif
 
 #include "platinum_hud.h"
+#include "platinum_rng_api.h"
 
 #define _16KB_READ_SIZE  0x4000
 #define _32KB_READ_SIZE  0x8000
@@ -281,6 +282,19 @@ static void platinumShowPauseHud(void) {
 				current
 			);
 	}
+
+	#ifndef DLDI
+		const PlatinumRngApi *api =
+			PLATINUM_RNG_API;
+
+		if (
+			api->magic == PLATINUM_RNG_API_MAGIC &&
+			api->version == PLATINUM_RNG_API_VERSION &&
+			api->enter
+		) {
+			api->enter(sharedAddr);
+		}
+	#endif
 
 	platinumHudEnter(
 		current,

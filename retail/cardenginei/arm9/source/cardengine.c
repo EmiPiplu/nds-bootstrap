@@ -65,7 +65,6 @@
 #include "card.h"
 //#endif
 
-#include "platinum_hud.h"
 #include "platinum_rng_api.h"
 
 #define _16KB_READ_SIZE  0x4000
@@ -269,39 +268,39 @@ static void platinumShowPauseHud(void) {
 		sharedAddr[PLATINUM_SHARED_MAGIC] ==
 			PLATINUM_RNG_MAGIC;
 
-	u32 initialSeed = 0;
-	u32 advances = 0;
+	PlatinumRngInfo info = {
+		.currentRng = current,
+		.initialSeed = 0,
+		.advances = 0,
+		.flags = 0,
+	};
 
 	if (haveInitialSeed) {
-		initialSeed =
+		info.initialSeed =
 			sharedAddr[PLATINUM_SHARED_SEED];
 
-		advances =
+		info.advances =
 			platinumRngDistance(
-				initialSeed,
+				info.initialSeed,
 				current
 			);
+
+		info.flags |=
+			PLATINUM_RNG_INFO_HAVE_SEED;
 	}
 
-	#ifndef DLDI
-		const PlatinumRngApi *api =
-			PLATINUM_RNG_API;
+	const PlatinumRngApi *api =
+		PLATINUM_RNG_API;
 
-		if (
-			api->magic == PLATINUM_RNG_API_MAGIC &&
-			api->version == PLATINUM_RNG_API_VERSION &&
-			api->enter
-		) {
-			api->enter(sharedAddr);
-		}
-	#endif
+	if (
+		api->magic != PLATINUM_RNG_API_MAGIC ||
+		api->version != PLATINUM_RNG_API_VERSION ||
+		!api->enter
+	) {
+		return;
+	}
 
-	platinumHudEnter(
-		current,
-		haveInitialSeed,
-		initialSeed,
-		advances
-	);
+	api->enter(&info);
 }
 
 /*
@@ -362,7 +361,16 @@ static u32 platinumPauseGateImpl(u32 callerLr) {
 				KEY_START
 			);
 
-			platinumHudLeave();
+			const PlatinumRngApi *api =
+				PLATINUM_RNG_API;
+
+			if (
+				api->magic == PLATINUM_RNG_API_MAGIC &&
+				api->version == PLATINUM_RNG_API_VERSION &&
+				api->leave
+			) {
+				api->leave();
+			}
 
 			sharedAddr[PLATINUM_SHARED_CONTROL] &= ~(
 				PLAT_CTRL_ACTIVE |
@@ -387,7 +395,16 @@ static u32 platinumPauseGateImpl(u32 callerLr) {
 				KEY_R
 			);
 
-			platinumHudLeave();
+			const PlatinumRngApi *api =
+				PLATINUM_RNG_API;
+
+			if (
+				api->magic == PLATINUM_RNG_API_MAGIC &&
+				api->version == PLATINUM_RNG_API_VERSION &&
+				api->leave
+			) {
+				api->leave();
+			}
 
 			sharedAddr[PLATINUM_SHARED_CONTROL] &= ~(
 				PLAT_CTRL_STEP |

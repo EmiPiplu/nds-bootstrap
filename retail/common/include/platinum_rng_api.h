@@ -5,19 +5,22 @@
 #include "locations.h"
 
 #define PLATINUM_RNG_API_MAGIC   0x474E5250
-#define PLATINUM_RNG_API_VERSION 1
+#define PLATINUM_RNG_API_VERSION 2
 
-/*
- * 0x474E5250 appears in RAM as:
- *
- * 50 52 4E 47
- * P  R  N  G
- */
+#define PLATINUM_RNG_INFO_HAVE_SEED BIT(0)
+
+typedef struct {
+	u32 currentRng;
+	u32 initialSeed;
+	u32 advances;
+	u32 flags;
+} PlatinumRngInfo;
+
 typedef struct {
 	u32 magic;
 	u32 version;
 
-	void (*enter)(vu32 *sharedAddr);
+	void (*enter)(const PlatinumRngInfo *info);
 	void (*leave)(void);
 } PlatinumRngApi;
 

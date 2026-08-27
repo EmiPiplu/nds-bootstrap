@@ -54,6 +54,10 @@ static void platinumUpdateTracking(
 	const PlatinumInput *input
 );
 
+static void platinumUpdateMethod(
+	const PlatinumInput *input
+);
+
 __attribute__((section(".header"), used))
 const PlatinumRngApi platinumRngApi = {
 	.magic   = PLATINUM_RNG_API_MAGIC,
@@ -126,10 +130,20 @@ static void platinumPayloadEnter(void)
 
 	platinumHudEnter();
 
-	if (currentScreen == PLATINUM_SCREEN_SETUP) {
-		platinumPayloadDrawSetup();
-	} else {
-		platinumPayloadDrawTracking();
+	switch (currentScreen) {
+		case PLATINUM_SCREEN_SETUP:
+			platinumPayloadDrawSetup();
+			break;
+
+		case PLATINUM_SCREEN_METHOD:
+			platinumHudDrawMethod(
+				methodSelection
+			);
+			break;
+
+		case PLATINUM_SCREEN_TRACKING:
+			platinumPayloadDrawTracking();
+			break;
 	}
 }
 
@@ -178,18 +192,31 @@ static void platinumUpdateSetup(
 			setupSelection--;
 		}
 
-		platinumHudDrawSetup(
-			setupSelection
-		);
+		platinumPayloadDrawSetup();
 	}
 
 	if (input->pressed & KEY_DOWN) {
 		setupSelection =
 			(setupSelection + 1) % 4;
 
-		platinumHudDrawSetup(
-			setupSelection
+		platinumPayloadDrawSetup();
+	}
+
+	if (
+		(input->pressed & KEY_A) &&
+		setupSelection == 1
+	) {
+		methodSelection =
+			(u8)searchConfig.method;
+
+		currentScreen =
+			PLATINUM_SCREEN_METHOD;
+
+		platinumHudDrawMethod(
+			methodSelection
 		);
+
+		return;
 	}
 
 	if (
@@ -210,9 +237,52 @@ static void platinumUpdateTracking(
 		currentScreen =
 			PLATINUM_SCREEN_SETUP;
 
-		platinumHudDrawSetup(
-			setupSelection
+		platinumPayloadDrawSetup();
+	}
+}
+
+static void platinumUpdateMethod(
+	const PlatinumInput *input
+) {
+	if (input->pressed & KEY_UP) {
+		if (methodSelection == 0) {
+			methodSelection =
+				RNG_METHOD_COUNT - 1;
+		} else {
+			methodSelection--;
+		}
+
+		platinumHudDrawMethod(
+			methodSelection
 		);
+	}
+
+	if (input->pressed & KEY_DOWN) {
+		methodSelection =
+			(methodSelection + 1) %
+			RNG_METHOD_COUNT;
+
+		platinumHudDrawMethod(
+			methodSelection
+		);
+	}
+
+	if (input->pressed & KEY_A) {
+		searchConfig.method =
+			(RngMethod)methodSelection;
+
+		currentScreen =
+			PLATINUM_SCREEN_SETUP;
+
+		platinumPayloadDrawSetup();
+		return;
+	}
+
+	if (input->pressed & KEY_B) {
+		currentScreen =
+			PLATINUM_SCREEN_SETUP;
+
+		platinumPayloadDrawSetup();
 	}
 }
 
@@ -246,6 +316,10 @@ static PlatinumPayloadAction platinumPayloadUpdate(u16 keys)
 	switch (currentScreen) {
 		case PLATINUM_SCREEN_SETUP:
 			platinumUpdateSetup(&input);
+			break;
+
+		case PLATINUM_SCREEN_METHOD:
+			platinumUpdateMethod(&input);
 			break;
 
 		case PLATINUM_SCREEN_TRACKING:

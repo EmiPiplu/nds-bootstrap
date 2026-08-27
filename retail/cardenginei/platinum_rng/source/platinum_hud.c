@@ -341,6 +341,7 @@ void platinumHudDrawTracking(
 
 void platinumHudDrawSetup(
 	u8 selection,
+	const char *speciesName,
 	const char *methodName
 ) {
 	toncset16(

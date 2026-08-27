@@ -7,7 +7,14 @@
 void platinumHudEnter(void);
 void platinumHudLeave(void);
 
-void platinumHudDrawSetup(u8 selection);
+void platinumHudDrawMethod(
+	u8 selection
+);
+
+void platinumHudDrawSetup(
+	u8 selection,
+	const char *methodName
+);
 
 void platinumHudDrawTracking(
 	u32 currentRng,

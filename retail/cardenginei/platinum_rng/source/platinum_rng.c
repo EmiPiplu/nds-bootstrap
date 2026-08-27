@@ -3,6 +3,7 @@
 
 #include "platinum_rng_api.h"
 #include "platinum_hud.h"
+#include "platinum_search.h"
 
 #define PLATINUM_RNG_ADDR 0x021BFB14
 
@@ -11,10 +12,23 @@
 
 #define PLATINUM_RNG_MAGIC 0x50474E52
 
+typedef struct {
+	u16 held;
+	u16 pressed;
+	u16 released;
+} PlatinumInput;
+
 typedef enum {
 	PLATINUM_SCREEN_SETUP,
+	PLATINUM_SCREEN_METHOD,
 	PLATINUM_SCREEN_TRACKING,
 } PlatinumScreen;
+
+static u8 methodSelection = 0;
+
+static SearchConfig searchConfig = {
+	.method = RNG_METHOD_STARTER,
+};
 
 static PlatinumScreen currentScreen =
 	PLATINUM_SCREEN_SETUP;
@@ -32,6 +46,14 @@ static void platinumPayloadEnter(void);
 static void platinumPayloadLeave(void);
 static void platinumPayloadDrawTracking(void);
 
+static void platinumUpdateSetup(
+	const PlatinumInput *input
+);
+
+static void platinumUpdateTracking(
+	const PlatinumInput *input
+);
+
 __attribute__((section(".header"), used))
 const PlatinumRngApi platinumRngApi = {
 	.magic   = PLATINUM_RNG_API_MAGIC,
@@ -41,6 +63,33 @@ const PlatinumRngApi platinumRngApi = {
 	.update  = platinumPayloadUpdate,
 };
 
+static const char *platinumMethodName(
+	RngMethod method
+) {
+	switch (method) {
+		case RNG_METHOD_STARTER:
+			return "STARTER";
+
+		case RNG_METHOD_WILD:
+			return "WILD";
+
+		case RNG_METHOD_STATIONARY:
+			return "STATIONARY";
+
+		default:
+			return "UNKNOWN";
+	}
+}
+
+static void platinumPayloadDrawSetup(void)
+{
+	platinumHudDrawSetup(
+		setupSelection,
+		platinumMethodName(
+			searchConfig.method
+		)
+	);
+}
 
 static u32 platinumRngDistance(
 	u32 state,
@@ -78,9 +127,7 @@ static void platinumPayloadEnter(void)
 	platinumHudEnter();
 
 	if (currentScreen == PLATINUM_SCREEN_SETUP) {
-		platinumHudDrawSetup(
-			setupSelection
-		);
+		platinumPayloadDrawSetup();
 	} else {
 		platinumPayloadDrawTracking();
 	}
@@ -121,64 +168,89 @@ static void platinumPayloadLeave(void) {
 	platinumHudLeave();
 }
 
+static void platinumUpdateSetup(
+	const PlatinumInput *input
+) {
+	if (input->pressed & KEY_UP) {
+		if (setupSelection == 0) {
+			setupSelection = 3;
+		} else {
+			setupSelection--;
+		}
+
+		platinumHudDrawSetup(
+			setupSelection
+		);
+	}
+
+	if (input->pressed & KEY_DOWN) {
+		setupSelection =
+			(setupSelection + 1) % 4;
+
+		platinumHudDrawSetup(
+			setupSelection
+		);
+	}
+
+	if (
+		(input->pressed & KEY_A) &&
+		setupSelection == 3
+	) {
+		currentScreen =
+			PLATINUM_SCREEN_TRACKING;
+
+		platinumPayloadDrawTracking();
+	}
+}
+
+static void platinumUpdateTracking(
+	const PlatinumInput *input
+) {
+	if (input->pressed & KEY_B) {
+		currentScreen =
+			PLATINUM_SCREEN_SETUP;
+
+		platinumHudDrawSetup(
+			setupSelection
+		);
+	}
+}
+
 static PlatinumPayloadAction platinumPayloadUpdate(u16 keys)
 {
-	u16 pressed =
-		keys & ~previousKeys;
-
-	u16 released =
-		previousKeys & ~keys;
+	PlatinumInput input = {
+		.held = keys,
+		.pressed = keys & ~previousKeys,
+		.released = previousKeys & ~keys,
+	};
 
 	previousKeys = keys;
 
-	if (released & KEY_START) {
+	/*
+	 * Global debugger controls.
+	 *
+	 * These work regardless of which menu screen
+	 * we're currently looking at.
+	 */
+	if (input.released & KEY_START) {
 		return PLATINUM_PAYLOAD_RESUME;
 	}
 
-	if (released & KEY_R) {
+	if (input.released & KEY_R) {
 		return PLATINUM_PAYLOAD_STEP;
 	}
 
-	if (currentScreen == PLATINUM_SCREEN_SETUP) {
-		if (pressed & KEY_UP) {
-			if (setupSelection == 0) {
-				setupSelection = 3;
-			} else {
-				setupSelection--;
-			}
+	/*
+	 * Everything else belongs to the active screen.
+	 */
+	switch (currentScreen) {
+		case PLATINUM_SCREEN_SETUP:
+			platinumUpdateSetup(&input);
+			break;
 
-			platinumHudDrawSetup(
-				setupSelection
-			);
-		}
-
-		if (pressed & KEY_DOWN) {
-			setupSelection =
-				(setupSelection + 1) % 4;
-
-			platinumHudDrawSetup(
-				setupSelection
-			);
-		}
-
-		if (
-			(pressed & KEY_A) &&
-			setupSelection == 3
-		) {
-			currentScreen =
-				PLATINUM_SCREEN_TRACKING;
-
-			platinumPayloadDrawTracking();
-		}
-	} else {
-		if (pressed & KEY_B) {
-			currentScreen =
-				PLATINUM_SCREEN_SETUP;
-
-			platinumHudDrawSetup(
-				setupSelection
-			);
-		}
+		case PLATINUM_SCREEN_TRACKING:
+			platinumUpdateTracking(&input);
+			break;
 	}
 
 	return PLATINUM_PAYLOAD_NONE;

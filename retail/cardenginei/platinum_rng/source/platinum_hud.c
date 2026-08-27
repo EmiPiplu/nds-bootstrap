@@ -339,34 +339,28 @@ void platinumHudDrawTracking(
 	);
 }
 
-void platinumHudDrawSetup(u8 selection)
-{
+void platinumHudDrawSetup(
+	u8 selection,
+	const char *methodName
+) {
 	toncset16(
 		BG_MAP_RAM_SUB(15),
 		0,
 		PLAT_HUD_MAP_WORDS
 	);
 
-	platinumHudPrint(
-		9,
-		2,
-		"PLATINUM RNG"
-	);
+	platinumHudPrint(9, 2, "PLATINUM RNG");
 
-	static const char *items[] = {
-		"POKEMON     ANY",
-		"METHOD      STARTER",
-		"CONDITIONS  ANY",
+	static const char *labels[] = {
+		"POKEMON",
+		"METHOD",
+		"CONDITIONS",
 		"CONFIRM",
 	};
 
 	for (u8 i = 0; i < 4; i++) {
 		int y = 6 + (i * 3);
 
-		/*
-		 * Our font already has X.
-		 * We can make a proper > glyph later.
-		 */
 		platinumHudPutChar(
 			2,
 			y,
@@ -376,20 +370,78 @@ void platinumHudDrawSetup(u8 selection)
 		platinumHudPrint(
 			4,
 			y,
+			labels[i]
+		);
+	}
+
+	platinumHudPrint(
+		16,
+		6,
+		"ANY"
+	);
+
+	platinumHudPrint(
+		16,
+		9,
+		methodName
+	);
+
+	platinumHudPrint(
+		16,
+		12,
+		"ANY"
+	);
+
+	platinumHudPrint(4, 20, "A SELECT");
+	platinumHudPrint(4, 22, "START RUN");
+}
+
+void platinumHudDrawMethod(u8 selection)
+{
+	toncset16(
+		BG_MAP_RAM_SUB(15),
+		0,
+		PLAT_HUD_MAP_WORDS
+	);
+
+	platinumHudPrint(
+		10,
+		2,
+		"METHOD"
+	);
+
+	static const char *items[] = {
+		"STARTER",
+		"WILD",
+		"STATIONARY",
+	};
+
+	for (u8 i = 0; i < 3; i++) {
+		int y = 7 + (i * 3);
+
+		platinumHudPutChar(
+			4,
+			y,
+			selection == i ? 'X' : ' '
+		);
+
+		platinumHudPrint(
+			6,
+			y,
 			items[i]
 		);
 	}
 
 	platinumHudPrint(
 		4,
-		20,
-		"A SELECT"
+		19,
+		"A CONFIRM"
 	);
 
 	platinumHudPrint(
 		4,
-		22,
-		"START RUN"
+		21,
+		"B CANCEL"
 	);
 }
 

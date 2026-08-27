@@ -97,14 +97,9 @@
 #define PLATINUM_SHARED_CONTROL 12
 
 #define PLAT_CTRL_ACTIVE  BIT(0)
-#define PLAT_CTRL_STEP    BIT(1)
-#define PLAT_CTRL_RUN     BIT(2)
-#define PLAT_CTRL_BLOCKED BIT(3)
+
 
 static bool platinumPauseChordWasHeld = false;
-static bool platinumStepWasHeld = false;
-static bool platinumRunWasHeld = false;
-
 static bool platinumRngTrackerInitialized = false;
 
 
@@ -238,74 +233,38 @@ u32 currentSrlAddr = 0;
 void i2cIRQHandler(void);
 
 static inline void trackPlatinumDebugControls(void) {
-	u16 keys = (~REG_KEYINPUT) & 0x03FF;
-
-	u32 control = sharedAddr[PLATINUM_SHARED_CONTROL];
-
-	bool active =
-		(control & PLAT_CTRL_ACTIVE) != 0;
-
-	bool blocked =
-		(control & PLAT_CTRL_BLOCKED) != 0;
+	u16 keys =
+		(~REG_KEYINPUT) & 0x03FF;
 
 	/*
-	 * Running:
-	 *
-	 * L+R+SELECT, then release the chord, enters debugger pause mode.
-	 * Triggering on RELEASE means the debug keys shouldn't leak
-	 * into the first frozen game frame.
+	 * Once the debugger is active, ARM9/payload owns
+	 * all debugger input until it resumes the game.
 	 */
-	if (!active) {
-		bool pauseChordHeld =
-			(keys & (KEY_L | KEY_R | KEY_SELECT))
-			== (KEY_L | KEY_R | KEY_SELECT);
-
-		if (platinumPauseChordWasHeld && !pauseChordHeld) {
-			sharedAddr[PLATINUM_SHARED_CONTROL] |=
-				PLAT_CTRL_ACTIVE;
-		}
-
-		platinumPauseChordWasHeld = pauseChordHeld;
-		platinumStepWasHeld = false;
-		platinumRunWasHeld = false;
-
+	if (
+		sharedAddr[PLATINUM_SHARED_CONTROL] &
+		PLAT_CTRL_ACTIVE
+	) {
 		return;
 	}
 
 	/*
-	 * ACTIVE but ARM9 is currently executing its one permitted
-	 * frame. Ignore debugger controls until it blocks again.
+	 * L+R+SELECT, then release the chord, enters
+	 * debugger pause mode.
 	 */
-	if (!blocked) {
-		platinumStepWasHeld = false;
-		platinumRunWasHeld = false;
-		return;
-	}
+	bool pauseChordHeld =
+		(keys & (KEY_L | KEY_R | KEY_SELECT))
+		== (KEY_L | KEY_R | KEY_SELECT);
 
-	/*
-	 * Paused:
-	 *
-	 * R tap     = one frame
-	 * START tap = resume
-	 *
-	 * Again, act on release so Platinum doesn't see R/START
-	 * during the frame we're allowing through.
-	 */
-	bool stepHeld = (keys & KEY_R) != 0;
-	bool runHeld = (keys & KEY_START) != 0;
-
-	if (platinumStepWasHeld && !stepHeld) {
+	if (
+		platinumPauseChordWasHeld &&
+		!pauseChordHeld
+	) {
 		sharedAddr[PLATINUM_SHARED_CONTROL] |=
-			PLAT_CTRL_STEP;
+			PLAT_CTRL_ACTIVE;
 	}
 
-	if (platinumRunWasHeld && !runHeld) {
-		sharedAddr[PLATINUM_SHARED_CONTROL] |=
-			PLAT_CTRL_RUN;
-	}
-
-	platinumStepWasHeld = stepHeld;
-	platinumRunWasHeld = runHeld;
+	platinumPauseChordWasHeld =
+		pauseChordHeld;
 }
 
 static inline void trackPlatinumInitialSeed(void) {

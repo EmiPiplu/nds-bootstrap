@@ -89,8 +89,6 @@
 #define PLATINUM_SHARED_CONTROL 12
 
 #define PLAT_CTRL_ACTIVE  BIT(0)
-#define PLAT_CTRL_STEP    BIT(1)
-#define PLAT_CTRL_RUN     BIT(2)
 #define PLAT_CTRL_BLOCKED BIT(3)
 
 #define PLATINUM_READ_INPUT_ADDR 0x02017B9C
@@ -343,8 +341,6 @@ static u32 platinumPauseGateImpl(u32 callerLr) {
 
 			sharedAddr[PLATINUM_SHARED_CONTROL] &= ~(
 				PLAT_CTRL_ACTIVE |
-				PLAT_CTRL_RUN |
-				PLAT_CTRL_STEP |
 				PLAT_CTRL_BLOCKED
 			);
 
@@ -357,7 +353,6 @@ static u32 platinumPauseGateImpl(u32 callerLr) {
 			platinumPayloadLeave();
 
 			sharedAddr[PLATINUM_SHARED_CONTROL] &= ~(
-				PLAT_CTRL_STEP |
 				PLAT_CTRL_BLOCKED
 			);
 

@@ -104,6 +104,8 @@
 
 extern cardengineArm9* volatile ce9;
 
+extern u32 platinumMpuDisable(void);
+extern void platinumMpuRestore(u32 control);
 
 extern void ndsCodeStart(u32* addr);
 extern u32 getDtcmBase(void);
@@ -300,7 +302,11 @@ static void platinumShowPauseHud(void) {
 		return;
 	}
 
+	u32 oldMpu = platinumMpuDisable();
+
 	api->enter(&info);
+
+	platinumMpuRestore(oldMpu);
 }
 
 /*

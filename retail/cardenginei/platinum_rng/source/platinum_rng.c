@@ -17,22 +17,11 @@ const PlatinumRngApi platinumRngApi = {
 	.leave   = platinumPayloadLeave,
 };
 
-static void platinumPayloadEnter(
-	const PlatinumRngInfo *info
-) {
-	if (!info) {
-		return;
-	}
-
-	platinumHudEnter(
-		info->currentRng,
-		(info->flags &
-		 PLATINUM_RNG_INFO_HAVE_SEED) != 0,
-		info->initialSeed,
-		info->advances
-	);
+static void platinumPayloadEnter(const PlatinumRngInfo *info)
+{
+    (void)info;
 }
 
-static void platinumPayloadLeave(void) {
-	platinumHudLeave();
+static void platinumPayloadLeave(void)
+{
 }

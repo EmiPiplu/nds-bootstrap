@@ -264,7 +264,7 @@ static void platinumHudPrintHex(
 	}
 }
 
-static void platinumHudDrawTracking(
+void platinumHudDrawTracking(
 	u32 currentRng,
 	bool haveInitialSeed,
 	u32 initialSeed,

@@ -247,6 +247,9 @@ static void platinumPayloadEnter(void)
 		case PLATINUM_SCREEN_TRACKING:
 			platinumPayloadDrawTracking();
 			break;
+		case PLATINUM_SCREEN_POKEMON:
+			platinumPayloadDrawPokemon();
+			break;
 	}
 }
 
@@ -471,7 +474,7 @@ static PlatinumPayloadAction platinumPayloadUpdate(u16 keys)
 			platinumUpdateTracking(&input);
 			break;
 		case PLATINUM_SCREEN_POKEMON:
-			platinumPayloadDrawPokemon();
+			platinumUpdatePokemon(&input);
 			break;
 	}
 

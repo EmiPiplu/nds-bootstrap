@@ -29,8 +29,8 @@ static vu32 *const sharedAddr =
 	(vu32 *)CARDENGINE_SHARED_ADDRESS_SDK1;
 
 static void platinumPayloadEnter(void);
-
 static void platinumPayloadLeave(void);
+static void platinumPayloadDrawTracking(void);
 
 __attribute__((section(".header"), used))
 const PlatinumRngApi platinumRngApi = {
@@ -123,6 +123,9 @@ static void platinumPayloadLeave(void) {
 
 static PlatinumPayloadAction platinumPayloadUpdate(u16 keys)
 {
+	u16 pressed =
+		keys & ~previousKeys;
+
 	u16 released =
 		previousKeys & ~keys;
 

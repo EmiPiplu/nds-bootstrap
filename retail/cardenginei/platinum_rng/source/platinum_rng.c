@@ -1,4 +1,5 @@
 #include <nds/ndstypes.h>
+#include <nds/input.h>
 
 #include "platinum_rng_api.h"
 #include "platinum_hud.h"
@@ -9,6 +10,10 @@
 #define PLATINUM_SHARED_SEED  10
 
 #define PLATINUM_RNG_MAGIC 0x50474E52
+
+static PlatinumPayloadAction platinumPayloadUpdate(u16 keys);
+
+static u16 previousKeys = 0;
 
 static vu32 *const sharedAddr =
 	(vu32 *)CARDENGINE_SHARED_ADDRESS_SDK1;
@@ -23,7 +28,9 @@ const PlatinumRngApi platinumRngApi = {
 	.version = PLATINUM_RNG_API_VERSION,
 	.enter   = platinumPayloadEnter,
 	.leave   = platinumPayloadLeave,
+	.update  = platinumPayloadUpdate,
 };
+
 
 static u32 platinumRngDistance(
 	u32 state,
@@ -56,6 +63,8 @@ static u32 platinumRngDistance(
 
 static void platinumPayloadEnter(void)
 {
+
+	previousKeys = 0;
 	u32 current =
 		*(vu32 *)PLATINUM_RNG_ADDR;
 
@@ -87,4 +96,22 @@ static void platinumPayloadEnter(void)
 
 static void platinumPayloadLeave(void) {
 	platinumHudLeave();
+}
+
+static PlatinumPayloadAction platinumPayloadUpdate(u16 keys)
+{
+	u16 released =
+		previousKeys & ~keys;
+
+	previousKeys = keys;
+
+	if (released & KEY_START) {
+		return PLATINUM_PAYLOAD_RESUME;
+	}
+
+	if (released & KEY_R) {
+		return PLATINUM_PAYLOAD_STEP;
+	}
+
+	return PLATINUM_PAYLOAD_NONE;
 }

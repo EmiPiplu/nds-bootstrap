@@ -267,6 +267,29 @@ static void platinumPayloadLeave(void)
 	platinumMpuRestore(oldMpu);
 }
 
+static PlatinumPayloadAction platinumPayloadUpdate(u16 keys)
+{
+	const PlatinumRngApi *api =
+		PLATINUM_RNG_API;
+
+	if (
+		api->magic != PLATINUM_RNG_API_MAGIC ||
+		api->version != PLATINUM_RNG_API_VERSION ||
+		!api->update
+	) {
+		return PLATINUM_PAYLOAD_NONE;
+	}
+
+	u32 oldMpu = platinumMpuDisable();
+
+	PlatinumPayloadAction action =
+		api->update(keys);
+
+	platinumMpuRestore(oldMpu);
+
+	return action;
+}
+
 /*
  * Normal C implementation of the debugger gate.
  *
@@ -309,22 +332,13 @@ static u32 platinumPauseGateImpl(u32 callerLr) {
 	platinumPayloadEnter();
 
 	while (1) {
-		u16 keys = (~REG_KEYINPUT) & 0x03FF;
+		u16 keys =
+			(~REG_KEYINPUT) & 0x03FF;
 
-		/*
-		* START: resume.
-		*
-		* Wait for release before returning to Platinum so the
-		* debugger key cannot leak into the game.
-		*/
-		if (keys & KEY_START) {
-			do {
-				swiDelay(100);
-			} while (
-				((~REG_KEYINPUT) & 0x03FF) &
-				KEY_START
-			);
+		PlatinumPayloadAction action =
+			platinumPayloadUpdate(keys);
 
+		if (action == PLATINUM_PAYLOAD_RESUME) {
 			platinumPayloadLeave();
 
 			sharedAddr[PLATINUM_SHARED_CONTROL] &= ~(
@@ -339,17 +353,7 @@ static u32 platinumPauseGateImpl(u32 callerLr) {
 			return platinumReadInputOriginal();
 		}
 
-		/*
-		* R: permit one NitroMain iteration.
-		*/
-		if (keys & KEY_R) {
-			do {
-				swiDelay(100);
-			} while (
-				((~REG_KEYINPUT) & 0x03FF) &
-				KEY_R
-			);
-
+		if (action == PLATINUM_PAYLOAD_STEP) {
 			platinumPayloadLeave();
 
 			sharedAddr[PLATINUM_SHARED_CONTROL] &= ~(

@@ -11,6 +11,16 @@
 
 #define PLATINUM_RNG_MAGIC 0x50474E52
 
+typedef enum {
+	PLATINUM_SCREEN_SETUP,
+	PLATINUM_SCREEN_TRACKING,
+} PlatinumScreen;
+
+static PlatinumScreen currentScreen =
+	PLATINUM_SCREEN_SETUP;
+
+static u8 setupSelection = 0;
+
 static PlatinumPayloadAction platinumPayloadUpdate(u16 keys);
 
 static u16 previousKeys = 0;
@@ -63,8 +73,21 @@ static u32 platinumRngDistance(
 
 static void platinumPayloadEnter(void)
 {
-
 	previousKeys = 0;
+
+	platinumHudEnter();
+
+	if (currentScreen == PLATINUM_SCREEN_SETUP) {
+		platinumHudDrawSetup(
+			setupSelection
+		);
+	} else {
+		platinumPayloadDrawTracking();
+	}
+}
+
+static void platinumPayloadDrawTracking(void)
+{
 	u32 current =
 		*(vu32 *)PLATINUM_RNG_ADDR;
 
@@ -86,7 +109,7 @@ static void platinumPayloadEnter(void)
 			);
 	}
 
-	platinumHudEnter(
+	platinumHudDrawTracking(
 		current,
 		haveInitialSeed,
 		initialSeed,
@@ -111,6 +134,48 @@ static PlatinumPayloadAction platinumPayloadUpdate(u16 keys)
 
 	if (released & KEY_R) {
 		return PLATINUM_PAYLOAD_STEP;
+	}
+
+	if (currentScreen == PLATINUM_SCREEN_SETUP) {
+		if (pressed & KEY_UP) {
+			if (setupSelection == 0) {
+				setupSelection = 3;
+			} else {
+				setupSelection--;
+			}
+
+			platinumHudDrawSetup(
+				setupSelection
+			);
+		}
+
+		if (pressed & KEY_DOWN) {
+			setupSelection =
+				(setupSelection + 1) % 4;
+
+			platinumHudDrawSetup(
+				setupSelection
+			);
+		}
+
+		if (
+			(pressed & KEY_A) &&
+			setupSelection == 3
+		) {
+			currentScreen =
+				PLATINUM_SCREEN_TRACKING;
+
+			platinumPayloadDrawTracking();
+		}
+	} else {
+		if (pressed & KEY_B) {
+			currentScreen =
+				PLATINUM_SCREEN_SETUP;
+
+			platinumHudDrawSetup(
+				setupSelection
+			);
+		}
 	}
 
 	return PLATINUM_PAYLOAD_NONE;

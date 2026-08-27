@@ -264,7 +264,7 @@ static void platinumHudPrintHex(
 	}
 }
 
-static void platinumHudDraw(
+static void platinumHudDrawTracking(
 	u32 currentRng,
 	bool haveInitialSeed,
 	u32 initialSeed,
@@ -339,13 +339,61 @@ static void platinumHudDraw(
 	);
 }
 
+void platinumHudDrawSetup(u8 selection)
+{
+	toncset16(
+		BG_MAP_RAM_SUB(15),
+		0,
+		PLAT_HUD_MAP_WORDS
+	);
 
-void platinumHudEnter(
-	u32 currentRng,
-	bool haveInitialSeed,
-	u32 initialSeed,
-	u32 advances
-) {
+	platinumHudPrint(
+		9,
+		2,
+		"PLATINUM RNG"
+	);
+
+	static const char *items[] = {
+		"POKEMON     ANY",
+		"METHOD      STARTER",
+		"CONDITIONS  ANY",
+		"CONFIRM",
+	};
+
+	for (u8 i = 0; i < 4; i++) {
+		int y = 6 + (i * 3);
+
+		/*
+		 * Our font already has X.
+		 * We can make a proper > glyph later.
+		 */
+		platinumHudPutChar(
+			2,
+			y,
+			selection == i ? 'X' : ' '
+		);
+
+		platinumHudPrint(
+			4,
+			y,
+			items[i]
+		);
+	}
+
+	platinumHudPrint(
+		4,
+		20,
+		"A SELECT"
+	);
+
+	platinumHudPrint(
+		4,
+		22,
+		"START RUN"
+	);
+}
+
+void platinumHudEnter(void) {
 	if (platinumHudState.active) {
 		return;
 	}
@@ -468,12 +516,6 @@ void platinumHudEnter(
 
 	platinumHudState.active = true;
 
-	platinumHudDraw(
-		currentRng,
-		haveInitialSeed,
-		initialSeed,
-		advances
-	);
 }
 
 

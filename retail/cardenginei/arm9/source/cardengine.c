@@ -375,7 +375,11 @@ static u32 platinumPauseGateImpl(u32 callerLr) {
 				api->version == PLATINUM_RNG_API_VERSION &&
 				api->leave
 			) {
+				u32 oldMpu = platinumMpuDisable();
+
 				api->leave();
+
+				platinumMpuRestore(oldMpu);
 			}
 
 			sharedAddr[PLATINUM_SHARED_CONTROL] &= ~(
@@ -409,7 +413,11 @@ static u32 platinumPauseGateImpl(u32 callerLr) {
 				api->version == PLATINUM_RNG_API_VERSION &&
 				api->leave
 			) {
+				u32 oldMpu = platinumMpuDisable();
+
 				api->leave();
+
+				platinumMpuRestore(oldMpu);
 			}
 
 			sharedAddr[PLATINUM_SHARED_CONTROL] &= ~(

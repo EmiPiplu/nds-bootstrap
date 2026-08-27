@@ -20,6 +20,7 @@ typedef struct {
 
 typedef enum {
 	PLATINUM_SCREEN_SETUP,
+	PLATINUM_SCREEN_POKEMON,
 	PLATINUM_SCREEN_METHOD,
 	PLATINUM_SCREEN_TRACKING,
 } PlatinumScreen;
@@ -30,6 +31,43 @@ static SearchConfig searchConfig = {
 	.method = RNG_METHOD_STARTER,
 	.species = SPECIES_ANY,
 };
+
+static const PokemonSpecies pokemonOptions[] = {
+	SPECIES_ANY,
+	SPECIES_TURTWIG,
+	SPECIES_CHIMCHAR,
+	SPECIES_PIPLUP,
+	SPECIES_BUNEARY,
+};
+
+static const char *platinumSpeciesName(
+	u16 species
+) {
+	switch (species) {
+		case SPECIES_ANY:
+			return "ANY";
+
+		case SPECIES_TURTWIG:
+			return "TURTWIG";
+
+		case SPECIES_CHIMCHAR:
+			return "CHIMCHAR";
+
+		case SPECIES_PIPLUP:
+			return "PIPLUP";
+
+		case SPECIES_BUNEARY:
+			return "BUNEARY";
+
+		default:
+			return "UNKNOWN";
+	}
+}
+
+#define POKEMON_OPTION_COUNT \
+	(sizeof(pokemonOptions) / sizeof(pokemonOptions[0]))
+
+static u8 pokemonSelection = 0;
 
 static PlatinumScreen currentScreen =
 	PLATINUM_SCREEN_SETUP;
@@ -90,9 +128,73 @@ static void platinumPayloadDrawSetup(void)
 {
 	platinumHudDrawSetup(
 		setupSelection,
+		platinumSpeciesName(
+			searchConfig.species
+		),
 		platinumMethodName(
 			searchConfig.method
 		)
+	);
+}
+
+static void platinumMovePokemonSelection(
+	int direction
+) {
+	do {
+		if (direction < 0) {
+			if (pokemonSelection == 0) {
+				pokemonSelection =
+					POKEMON_OPTION_COUNT - 1;
+			} else {
+				pokemonSelection--;
+			}
+		} else {
+			pokemonSelection =
+				(pokemonSelection + 1) %
+				POKEMON_OPTION_COUNT;
+		}
+	} while (
+		!platinumSearchSpeciesAllowed(
+			searchConfig.method,
+			pokemonOptions[
+				pokemonSelection
+			]
+		)
+	);
+}
+
+static void platinumPayloadDrawPokemon(void)
+{
+	const char *items[POKEMON_OPTION_COUNT];
+
+	u8 count = 0;
+	u8 visibleSelection = 0;
+
+	for (u8 i = 0;
+	     i < POKEMON_OPTION_COUNT;
+	     i++) {
+
+		if (!platinumSearchSpeciesAllowed(
+			searchConfig.method,
+			pokemonOptions[i]
+		)) {
+			continue;
+		}
+
+		if (i == pokemonSelection) {
+			visibleSelection = count;
+		}
+
+		items[count++] =
+			platinumSpeciesName(
+				pokemonOptions[i]
+			);
+	}
+
+	platinumHudDrawPokemon(
+		visibleSelection,
+		items,
+		count
 	);
 }
 
@@ -295,6 +397,40 @@ static void platinumUpdateMethod(
 	}
 }
 
+static void platinumUpdatePokemon(
+	const PlatinumInput *input
+) {
+	if (input->pressed & KEY_UP) {
+		platinumMovePokemonSelection(-1);
+		platinumPayloadDrawPokemon();
+	}
+
+	if (input->pressed & KEY_DOWN) {
+		platinumMovePokemonSelection(1);
+		platinumPayloadDrawPokemon();
+	}
+
+	if (input->pressed & KEY_A) {
+		searchConfig.species =
+			pokemonOptions[
+				pokemonSelection
+			];
+
+		currentScreen =
+			PLATINUM_SCREEN_SETUP;
+
+		platinumPayloadDrawSetup();
+		return;
+	}
+
+	if (input->pressed & KEY_B) {
+		currentScreen =
+			PLATINUM_SCREEN_SETUP;
+
+		platinumPayloadDrawSetup();
+	}
+}
+
 static PlatinumPayloadAction platinumPayloadUpdate(u16 keys)
 {
 	PlatinumInput input = {
@@ -333,6 +469,9 @@ static PlatinumPayloadAction platinumPayloadUpdate(u16 keys)
 
 		case PLATINUM_SCREEN_TRACKING:
 			platinumUpdateTracking(&input);
+			break;
+		case PLATINUM_SCREEN_POKEMON:
+			platinumPayloadDrawPokemon();
 			break;
 	}
 

@@ -377,7 +377,7 @@ void platinumHudDrawSetup(
 	platinumHudPrint(
 		16,
 		6,
-		"ANY"
+		speciesName
 	);
 
 	platinumHudPrint(
@@ -394,6 +394,43 @@ void platinumHudDrawSetup(
 
 	platinumHudPrint(4, 20, "A SELECT");
 	platinumHudPrint(4, 22, "START RUN");
+}
+
+void platinumHudDrawPokemon(
+	u8 selection,
+	const char *const *items,
+	u8 count
+) {
+	toncset16(
+		BG_MAP_RAM_SUB(15),
+		0,
+		PLAT_HUD_MAP_WORDS
+	);
+
+	platinumHudPrint(
+		9,
+		2,
+		"POKEMON"
+	);
+
+	for (u8 i = 0; i < count; i++) {
+		int y = 5 + (i * 3);
+
+		platinumHudPutChar(
+			2,
+			y,
+			selection == i ? 'X' : ' '
+		);
+
+		platinumHudPrint(
+			4,
+			y,
+			items[i]
+		);
+	}
+
+	platinumHudPrint(4, 20, "A CONFIRM");
+	platinumHudPrint(4, 22, "B CANCEL");
 }
 
 void platinumHudDrawMethod(u8 selection)

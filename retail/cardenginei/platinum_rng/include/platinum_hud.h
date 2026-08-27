@@ -13,6 +13,7 @@ void platinumHudDrawMethod(
 
 void platinumHudDrawSetup(
 	u8 selection,
+	const char *speciesName,
 	const char *methodName
 );
 
@@ -21,6 +22,12 @@ void platinumHudDrawTracking(
 	bool haveInitialSeed,
 	u32 initialSeed,
 	u32 advances
+);
+
+void platinumHudDrawPokemon(
+	u8 selection,
+	const char *const *items,
+	u8 count
 );
 
 #endif

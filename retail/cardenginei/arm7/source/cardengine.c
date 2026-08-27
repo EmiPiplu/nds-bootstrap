@@ -97,7 +97,7 @@
 #define PLATINUM_SHARED_CONTROL 12
 
 #define PLAT_CTRL_ACTIVE  BIT(0)
-
+#define PLAT_CTRL_BLOCKED BIT(3)
 
 static bool platinumPauseChordWasHeld = false;
 static bool platinumRngTrackerInitialized = false;

@@ -28,6 +28,7 @@ static u8 methodSelection = 0;
 
 static SearchConfig searchConfig = {
 	.method = RNG_METHOD_STARTER,
+	.species = SPECIES_ANY,
 };
 
 static PlatinumScreen currentScreen =
@@ -223,6 +224,14 @@ static void platinumUpdateSetup(
 		(input->pressed & KEY_A) &&
 		setupSelection == 3
 	) {
+		if (
+			platinumSearchValidate(
+				&searchConfig
+			) != SEARCH_CONFIG_OK
+		) {
+			return;
+		}
+
 		currentScreen =
 			PLATINUM_SCREEN_TRACKING;
 

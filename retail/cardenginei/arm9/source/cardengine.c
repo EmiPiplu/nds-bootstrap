@@ -86,14 +86,6 @@
 #define END_FLAG   0
 #define BUSY_FLAG   4
 
-#define PLATINUM_RNG_ADDR 0x021BFB14
-
-#define PLATINUM_SHARED_MAGIC 9
-#define PLATINUM_SHARED_SEED  10
-#define PLATINUM_SHARED_CONTROL 12
-
-#define PLATINUM_RNG_MAGIC 0x50474E52
-
 #define PLAT_CTRL_ACTIVE  BIT(0)
 #define PLAT_CTRL_STEP    BIT(1)
 #define PLAT_CTRL_RUN     BIT(2)
@@ -233,64 +225,8 @@ static u32 platinumReadInputOriginal(void) {
 	);
 }
 
-static u32 platinumRngDistance(
-	u32 state,
-	u32 target
-) {
-	u32 curMult = 0x41C64E6D;
-	u32 curPlus = 0x6073;
-	u32 distance = 0;
-
-	for (u32 bit = 1;
-	     bit != 0;
-	     bit <<= 1) {
-
-		if ((state & bit) !=
-		    (target & bit)) {
-
-			state =
-				state * curMult +
-				curPlus;
-
-			distance |= bit;
-		}
-
-		curPlus *= curMult + 1;
-		curMult *= curMult;
-	}
-
-	return distance;
-}
-
-static void platinumShowPauseHud(void) {
-	u32 current =
-		*(vu32 *)PLATINUM_RNG_ADDR;
-
-	bool haveInitialSeed =
-		sharedAddr[PLATINUM_SHARED_MAGIC] ==
-			PLATINUM_RNG_MAGIC;
-
-	PlatinumRngInfo info = {
-		.currentRng = current,
-		.initialSeed = 0,
-		.advances = 0,
-		.flags = 0,
-	};
-
-	if (haveInitialSeed) {
-		info.initialSeed =
-			sharedAddr[PLATINUM_SHARED_SEED];
-
-		info.advances =
-			platinumRngDistance(
-				info.initialSeed,
-				current
-			);
-
-		info.flags |=
-			PLATINUM_RNG_INFO_HAVE_SEED;
-	}
-
+static void platinumPayloadEnter(void)
+{
 	const PlatinumRngApi *api =
 		PLATINUM_RNG_API;
 
@@ -304,7 +240,27 @@ static void platinumShowPauseHud(void) {
 
 	u32 oldMpu = platinumMpuDisable();
 
-	api->enter(&info);
+	api->enter();
+
+	platinumMpuRestore(oldMpu);
+}
+
+static void platinumPayloadLeave(void)
+{
+	const PlatinumRngApi *api =
+		PLATINUM_RNG_API;
+
+	if (
+		api->magic != PLATINUM_RNG_API_MAGIC ||
+		api->version != PLATINUM_RNG_API_VERSION ||
+		!api->leave
+	) {
+		return;
+	}
+
+	u32 oldMpu = platinumMpuDisable();
+
+	api->leave();
 
 	platinumMpuRestore(oldMpu);
 }
@@ -348,7 +304,7 @@ static u32 platinumPauseGateImpl(u32 callerLr) {
 	* ARM9 is now parked at our safe NitroMain boundary.
 	* Replace Platinum's bottom screen with debugger telemetry.
 	*/
-	platinumShowPauseHud();
+	platinumPayloadEnter();
 
 	while (1) {
 		u16 keys = (~REG_KEYINPUT) & 0x03FF;
@@ -367,20 +323,7 @@ static u32 platinumPauseGateImpl(u32 callerLr) {
 				KEY_START
 			);
 
-			const PlatinumRngApi *api =
-				PLATINUM_RNG_API;
-
-			if (
-				api->magic == PLATINUM_RNG_API_MAGIC &&
-				api->version == PLATINUM_RNG_API_VERSION &&
-				api->leave
-			) {
-				u32 oldMpu = platinumMpuDisable();
-
-				api->leave();
-
-				platinumMpuRestore(oldMpu);
-			}
+			platinumPayloadLeave();
 
 			sharedAddr[PLATINUM_SHARED_CONTROL] &= ~(
 				PLAT_CTRL_ACTIVE |
@@ -405,20 +348,7 @@ static u32 platinumPauseGateImpl(u32 callerLr) {
 				KEY_R
 			);
 
-			const PlatinumRngApi *api =
-				PLATINUM_RNG_API;
-
-			if (
-				api->magic == PLATINUM_RNG_API_MAGIC &&
-				api->version == PLATINUM_RNG_API_VERSION &&
-				api->leave
-			) {
-				u32 oldMpu = platinumMpuDisable();
-
-				api->leave();
-
-				platinumMpuRestore(oldMpu);
-			}
+			platinumPayloadLeave();
 
 			sharedAddr[PLATINUM_SHARED_CONTROL] &= ~(
 				PLAT_CTRL_STEP |
